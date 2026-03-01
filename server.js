@@ -8,7 +8,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const app = express();
 app.use(cors());
 
-// NEW: This tells the server to send your index.html file to anyone who visits the link
+// Serve the HTML file directly from the server
 app.use(express.static(__dirname));
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
@@ -19,6 +19,7 @@ const io = new Server(server, {
     cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
+// We will store basic room info here
 const rooms = {};
 
 // --- MULTIPLAYER GAME LOGIC ---
@@ -26,26 +27,37 @@ io.on('connection', (socket) => {
     console.log(`Player connected: ${socket.id}`);
 
     socket.on('joinRoom', (roomId) => {
-        if (!rooms[roomId]) { rooms[roomId] = { players: [], maxPlayers: 2 }; }
+        // If the room doesn't exist yet, create it and set default capacity to 2
+        if (!rooms[roomId]) {
+            rooms[roomId] = { players: [], maxPlayers: 2 };
+        }
 
+        // DYNAMIC CHECK: Is the room full based on the Host's current setting?
         if (rooms[roomId].players.length >= rooms[roomId].maxPlayers) {
+            console.log(`Player ${socket.id} tried to join ${roomId}, but it is full (Max: ${rooms[roomId].maxPlayers}).`);
             socket.emit('roomFull', rooms[roomId].maxPlayers); 
             return; 
         }
 
+        // If not full, let them join
         socket.join(roomId);
         const myPlayerId = rooms[roomId].players.length;
         rooms[roomId].players.push(socket.id);
+
+        console.log(`Player ${socket.id} joined ${roomId} as Player ${myPlayerId}`);
         socket.emit('assignPlayerId', myPlayerId);
         io.to(roomId).emit('playerCountUpdate', rooms[roomId].players.length);
     });
 
     socket.on('hostStartedGame', (data) => {
+        console.log(`Game started in room ${data.roomId} with ${data.numPlayers} players`);
         socket.to(data.roomId).emit('gameStartedByHost', data);
     });
 
     socket.on('lobbyUpdate', (data) => {
-        if (rooms[data.roomId]) { rooms[data.roomId].maxPlayers = data.numPlayers; }
+        if (rooms[data.roomId]) {
+            rooms[data.roomId].maxPlayers = data.numPlayers;
+        }
         socket.to(data.roomId).emit('lobbyUpdated', data);
     });
 
@@ -67,48 +79,55 @@ io.on('connection', (socket) => {
 });
 
 // --- TELEGRAM BOT LOGIC ---
-// !!! REPLACE THIS WITH YOUR TOKEN FROM BOTFATHER !!!
+// !!! PUT YOUR ACTUAL BOT TOKEN HERE !!!
 const token = '8508348463:AAGlD368tiBlU6u7p1uFLFHbqAtDpeUADFA'; 
 
-// !!! REPLACE THIS WITH YOUR FUTURE GLITCH URL (e.g., https://my-atomic-game.glitch.me) !!!
-const GAME_URL = 'https://atomic-blast.onrender.com/'; 
+// !!! PUT YOUR URL HERE (Use http://localhost:3000 for local testing) !!!
+const GAME_URL = 'https://atomic-blast.onrender.com'; 
 
 if (token !== 'YOUR_BOT_TOKEN_HERE') {
     const bot = new TelegramBot(token, { polling: true });
 
+    // FIX 1: Clear any stuck webhooks that might prevent polling from working
+    bot.deleteWebHook().catch(console.error);
+
     // This handles the inline @username query
     bot.on('inline_query', (query) => {
-        // Generate a random room ID for this specific chat
+        console.log(`[BOT] Received inline query from: ${query.from.first_name}`);
+
         const randomRoom = Math.random().toString(36).substring(2, 8).toUpperCase();
         const roomLink = `${GAME_URL}/?room=${randomRoom}`;
 
         const results = [
             {
                 type: 'article',
-                id: '1',
+                id: query.id, // FIX 2: Use a unique ID so Telegram doesn't get confused
                 title: 'Play Atomic Blast!',
                 description: 'Click to drop a game button in this chat.',
                 input_message_content: {
-                    message_text: '💥 **Atomic Blast**\nI challenge you to a multiplayer match! Click the button below to join the lobby.'
+                    message_text: '💥 **Atomic Blast**\nI challenge you to a multiplayer match! Click the button below to join the lobby.',
+                    parse_mode: 'Markdown'
                 },
                 reply_markup: {
                     inline_keyboard: [[
                         {
                             text: "🎮 Join Game",
-                            web_app: { url: roomLink } // Opens the game natively in Telegram
+                            web_app: { url: roomLink }
                         }
                     ]]
                 }
             }
         ];
-        bot.answerInlineQuery(query.id, results);
+        
+        // FIX 3: Add cache_time: 0 so Telegram generates a fresh room link every single time
+        bot.answerInlineQuery(query.id, results, { cache_time: 0 }).catch(err => {
+            console.error("\n[BOT ERROR] Telegram rejected the query!");
+            console.error("Reason:", err.response ? err.response.body : err.message);
+            console.error("\n");
+        });
     });
-    console.log("Telegram Bot is running!");
+    
+    console.log("Telegram Bot logic is initialized!");
+} else {
+    console.log("WARNING: Telegram Bot is NOT running. Please replace 'YOUR_BOT_TOKEN_HERE' with your real token.");
 }
-
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-
-});
-
