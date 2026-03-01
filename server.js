@@ -8,6 +8,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const app = express();
 app.use(cors());
 
+
 // Serve the HTML file directly from the server
 app.use(express.static(__dirname));
 app.get('/', (req, res) => {
@@ -131,3 +132,4 @@ if (token !== 'YOUR_BOT_TOKEN_HERE') {
 } else {
     console.log("WARNING: Telegram Bot is NOT running. Please replace 'YOUR_BOT_TOKEN_HERE' with your real token.");
 }
+
