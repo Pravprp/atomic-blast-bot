@@ -79,14 +79,16 @@ io.on('connection', (socket) => {
     });
 });
 
-// --- TELEGRAM BOT LOGIC ---
-// !!! PUT YOUR ACTUAL BOT TOKEN HERE !!!
-const token = process.env.TELEGRAM_BOT_TOKEN;
 
-// !!! PUT YOUR URL HERE (Use http://localhost:3000 for local testing) !!!
+// --- TELEGRAM BOT LOGIC ---
+const token = process.env.TELEGRAM_BOT_TOKEN; 
 const GAME_URL = 'https://atomic-blast.onrender.com'; 
 
-if (token !== 'YOUR_BOT_TOKEN_HERE') {
+// DEBUG TRACKER: This will tell us if Render is actually loading the token!
+console.log("DEBUG - Token check:", token ? token.substring(0, 5) + "******" : "UNDEFINED! (Render is not loading the variable)");
+
+// Added a stricter check here
+if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
     const bot = new TelegramBot(token, { polling: true });
 
     // FIX 1: Clear any stuck webhooks that might prevent polling from working
@@ -132,5 +134,6 @@ if (token !== 'YOUR_BOT_TOKEN_HERE') {
 } else {
     console.log("WARNING: Telegram Bot is NOT running. Please replace 'YOUR_BOT_TOKEN_HERE' with your real token.");
 }
+
 
 
