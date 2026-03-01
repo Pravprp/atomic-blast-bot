@@ -81,7 +81,9 @@ io.on('connection', (socket) => {
 
 
 // --- TELEGRAM BOT LOGIC ---
-const token = process.env.TELEGRAM_BOT_TOKEN; 
+const rawToken = process.env.TELEGRAM_BOT_TOKEN;
+// .trim() strips away any invisible spaces or formatting hackers!
+const token = rawToken ? rawToken.trim() : undefined;
 const GAME_URL = 'https://atomic-blast.onrender.com'; 
 
 // DEBUG TRACKER: This will tell us if Render is actually loading the token!
@@ -134,6 +136,7 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
 } else {
     console.log("WARNING: Telegram Bot is NOT running. Please replace 'YOUR_BOT_TOKEN_HERE' with your real token.");
 }
+
 
 
 
