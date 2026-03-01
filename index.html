@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Atomic Blast (Online)</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        /* --- RESET & BASIC STYLES --- */
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            color: white;
+            touch-action: none;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        button {
+            cursor: pointer;
+            border: none;
+            outline: none;
+            font-family: inherit;
+        }
+
+        /* --- UTILITY CLASSES REPLACEMENT --- */
+        .hidden {
+            display: none !important;
+        }
+
+        .flex {
+            display: flex;
+        }
+
+        .flex-col {
+            flex-direction: column;
+        }
+
+        .items-center {
+            align-items: center;
+        }
+
+        .justify-between {
+            justify-content: space-between;
+        }
+
+        .justify-center {
+            justify-content: center;
+        }
+
+        .gap-2 {
+            gap: 0.5rem;
+        }
+
+        .gap-4 {
+            gap: 1rem;
+        }
+
+        .flex-grow {
+            flex-grow: 1;
+        }
+
+        .absolute {
+            position: absolute;
+        }
+
+        .relative {
+            position: relative;
+        }
+
+        .inset-0 {
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+
+        .top-1\/2 {
+            top: 50% !important;
+        }
+
+        .left-1\/2 {
+            left: 50% !important;
+        }
+
+        .z-10 {
+            z-index: 10;
+        }
+
+        .z-20 {
+            z-index: 20;
+        }
+
+        .z-30 {
+            z-index: 30;
+        }
+
+        .z-40 {
+            z-index: 40;
+        }
+
+        .w-full {
+            width: 100%;
+        }
+
+        .h-screen {
+            height: 100vh;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .text-white {
+            color: white;
+        }
+
+        .font-bold {
+            font-weight: bold;
+        }
+
+        .uppercase {
+            text-transform: uppercase;
+        }
+
+        /* --- SPECIFIC COMPONENT STYLING --- */
+
+        /* Top Bar */
+        .top-bar {
+            height: 3.5rem;
+            /* h-14 */
+            padding: 0 1rem;
+            background-color: #111827;
+            /* bg-gray-900 */
+            border-bottom: 1px solid #1f2937;
+            /* border-gray-800 */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            flex-shrink: 0;
+        }
+
+        .game-title {
+            font-size: 1.25rem;
+            /* text-xl */
+            font-weight: 700;
+            background: linear-gradient(to right, #60a5fa, #a855f7);
+            /* blue-400 to purple-500 */
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Controls */
+        .control-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.25rem;
+            font-size: 0.875rem;
+            color: white;
+            transition: all 0.2s;
+        }
+
+        .control-btn:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .control-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        /* JS Toggled Classes for Buttons (Keep these exact names) */
+        .opacity-70 {
+            opacity: 0.7;
+        }
+
+        .opacity-100 {
+            opacity: 1;
+        }
+
+        .hover\:opacity-100:hover {
+            opacity: 1;
+        }
+
+        .bg-blue-600 {
+            background-color: #2563eb !important;
+            border-color: #3b82f6 !important;
+        }
+
+        /* Game Container */
+        #game-container {
+            background-color: #000;
+        }
+
+        /* Glass Panel (Menu) */
+        .glass-panel {
+            background: rgba(30, 30, 30, 0.95);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 1.5rem;
+            /* p-6 */
+            border-radius: 1rem;
+            /* rounded-2xl */
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            max-width: 24rem;
+            /* max-w-sm */
+            width: 100%;
+            margin: 1rem;
+        }
+
+        /* Player Count Controls */
+        .circle-btn {
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 50%;
+            background-color: #374151;
+            /* gray-700 */
+            color: white;
+            font-weight: bold;
+            font-size: 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s;
+        }
+
+        .circle-btn:hover {
+            background-color: #4b5563;
+            /* gray-600 */
+        }
+
+        #playerCountDisplay {
+            font-family: monospace;
+            font-size: 1.875rem;
+            width: 3rem;
+            color: #60a5fa;
+            /* blue-400 */
+        }
+
+        /* Grid Selection */
+        .grid-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .grid-btn {
+            border: 1px solid #444;
+            background: #2a2a2a;
+            color: #888;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+
+        .grid-btn.active {
+            background: #3b82f6;
+            /* blue-500 */
+            color: white;
+            border-color: #3b82f6;
+            font-weight: bold;
+        }
+
+        /* Inputs */
+        .grid-input {
+            background: #1a1a1a;
+            border: 1px solid #444;
+            color: white;
+            text-align: center;
+            border-radius: 0.5rem;
+            width: 4rem;
+            height: 2.5rem;
+        }
+
+        .grid-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+
+        /* Start Button */
+        #startBtn {
+            padding: 1rem;
+            background: linear-gradient(to right, #2563eb, #9333ea);
+            border-radius: 0.75rem;
+            font-size: 1.125rem;
+            font-weight: bold;
+            color: white;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            transition: transform 0.1s;
+        }
+
+        #startBtn:hover {
+            transform: scale(1.02);
+        }
+
+        #startBtn:active {
+            transform: scale(0.95);
+        }
+
+        /* Overlays & Labels */
+        .label-text {
+            display: block;
+            color: #9ca3af;
+            /* gray-400 */
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Winner Screen */
+        #winnerOverlay {
+            background: rgba(0, 0, 0, 0.9);
+        }
+
+        #winnerIcon {
+            width: 6rem;
+            height: 6rem;
+            border-radius: 50%;
+            margin: 0 auto 1rem auto;
+            border: 4px solid white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #1f2937;
+            font-size: 2.25rem;
+        }
+
+        #winnerText {
+            font-size: 2.25rem;
+            font-weight: 900;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Elimination Popup */
+        #eliminationPopup {
+            background: rgba(17, 24, 39, 0.95);
+            border: 2px solid white;
+            padding: 1.5rem 2rem;
+            border-radius: 1rem;
+            min-width: 250px;
+            pointer-events: none;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            transform: translate(-50%, -50%);
+        }
+
+        /* Animations */
+        @keyframes fadeOutScale {
+            0% {
+                opacity: 0;
+                transform: translate(-50%, -40%) scale(0.8);
+            }
+
+            10% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1.1);
+            }
+
+            80% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
+
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -60%) scale(0.9);
+            }
+        }
+
+        .animate-elimination {
+            animation: fadeOutScale 1.0s ease-out forwards;
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="top-bar flex items-center justify-between z-10 relative">
+        <h1 class="game-title">Atomic Blast</h1>
+
+        <div id="gameControls" class="flex gap-2 hidden">
+            <button id="thickGridBtn" class="control-btn bg-blue-600 text-white opacity-100">
+                Bold Grid
+            </button>
+            <button id="undoBtn" class="control-btn flex items-center gap-2" disabled>
+                <span>↩</span> Undo
+            </button>
+        </div>
+    </div>
+
+    <div class="flex-grow relative flex items-center justify-center" id="game-container">
+        <canvas id="gameCanvas"></canvas>
+
+        <div id="turnIndicator" class="absolute z-10 hidden flex items-center justify-center" 
+             style="top: 1.5rem; padding: 0.5rem 1.5rem; border-radius: 2rem; font-weight: 900; letter-spacing: 2px; border: 2px solid white; pointer-events: none; transition: opacity 0.2s;">
+            YOUR TURN
+        </div>
+
+        <div id="menuOverlay" class="absolute inset-0 flex items-center justify-center z-20"
+            style="background-color: rgba(0,0,0,0.8);">
+            <div class="glass-panel text-center">
+                <h2 class="text-3xl font-bold mb-6 text-white"
+                    style="letter-spacing: 0.05em; font-size: 1.875rem; margin-bottom: 1.5rem;">NEW GAME</h2>
+
+        <p id="connectionStatus" style="color: #4ade80; font-weight: bold; margin-bottom: 1rem;">
+                 🟢 Connected: 1
+            </p>
+
+                <div style="margin-bottom: 1.5rem;">
+                    <label class="label-text">Number of Players</label>
+                    <div class="flex justify-center gap-4 items-center">
+                        <button id="pDec" class="circle-btn">-</button>
+                        <span id="playerCountDisplay">2</span>
+                        <button id="pInc" class="circle-btn">+</button>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 2rem;">
+                    <label class="label-text">Grid Size</label>
+                    <div class="grid-grid">
+                        <button class="grid-btn" onclick="selectGrid(4,4, this)">4x4</button>
+                        <button class="grid-btn" onclick="selectGrid(5,5, this)">5x5</button>
+                        <button class="grid-btn active" onclick="selectGrid(6,6, this)">6x6</button>
+                        <button class="grid-btn" onclick="toggleCustomGrid(this)">Custom</button>
+                    </div>
+
+                    <div id="customGridInputs" class="hidden flex justify-center items-center gap-2 animate-fade-in"
+                        style="margin-top: 0.75rem;">
+                        <div class="flex flex-col">
+                            <input type="number" id="customRows" value="9" min="3" max="15" class="grid-input">
+                            <span class="text-center"
+                                style="font-size: 10px; color: #6b7280; margin-top: 4px;">Rows</span>
+                        </div>
+                        <span style="color: #9ca3af; font-weight: bold;">×</span>
+                        <div class="flex flex-col">
+                            <input type="number" id="customCols" value="6" min="3" max="15" class="grid-input">
+                            <span class="text-center"
+                                style="font-size: 10px; color: #6b7280; margin-top: 4px;">Cols</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="startBtn" class="w-full">
+                    PLAY
+                </button>
+            </div>
+        </div>
+
+        <div id="winnerOverlay" class="absolute inset-0 flex items-center justify-center z-30 hidden">
+            <div class="text-center" style="padding: 1rem;">
+                <div id="winnerIcon">
+                    <span>👑</span>
+                </div>
+                <h2 id="winnerText">PLAYER 1 WINS!</h2>
+                <p style="color: #9ca3af;">Tap anywhere to continue</p>
+            </div>
+        </div>
+
+        <div id="eliminationPopup"
+            class="absolute top-1/2 left-1/2 z-40 hidden flex flex-col items-center justify-center">
+            <span style="font-size: 1.875rem; margin-bottom: 0.5rem;">💀</span>
+            <h2 id="eliminationText"
+                style="font-size: 1.5rem; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase;">RED
+                ELIMINATED</h2>
+        </div>
+    </div>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        /**
+         * Game Configuration & Constants
+         */
+        const COLORS = [
+            { name: 'RED', main: '#E6194B', glow: 'rgba(230, 25, 75, 0.8)' },
+            { name: 'GREEN', main: '#3CB44B', glow: 'rgba(60, 180, 75, 0.8)' },
+            { name: 'YELLOW', main: '#FFE119', glow: 'rgba(255, 225, 25, 0.8)' },
+            { name: 'BLUE', main: '#4363D8', glow: 'rgba(67, 99, 216, 0.8)' },
+            { name: 'ORANGE', main: '#F58231', glow: 'rgba(245, 130, 49, 0.8)' },
+            { name: 'WHITE', main: '#FFFFFF', glow: 'rgba(255, 255, 255, 0.8)' },
+            { name: 'PINK', main: '#FF69B4', glow: 'rgba(255, 105, 180, 0.8)' },
+            { name: 'BROWN', main: '#D2691E', glow: 'rgba(210, 105, 30, 0.8)' }
+        ];
+
+        const ORB_RADIUS_RATIO = 0.25; // Size relative to cell
+        const CELL_PADDING = 2;
+        const ANIMATION_SPEED = 0.15; // Speed of flying particles (0-1)
+
+        /**
+         * Game State
+         */
+        // --- MULTIPLAYER SETUP ---
+        const socket = io();
+        
+        // 1. Check for Dynamic Room ID in the URL
+        const urlParams = new URLSearchParams(window.location.search);
+        let ROOM_ID = urlParams.get('room');
+
+        // If no room code exists, generate one
+        if (!ROOM_ID) {
+            ROOM_ID = Math.random().toString(36).substring(2, 8).toUpperCase();
+            try {
+                window.history.replaceState({}, '', `?room=${ROOM_ID}`);
+            } catch (error) {
+                console.log("Local testing blocked URL update. Room ID is:", ROOM_ID);
+            }
+        }
+        console.log("Joining Room:", ROOM_ID);
+
+        let myPlayerId = null; // Stores if I am Player 0 (Red), Player 1 (Green), etc.
+
+        socket.on('connect', () => {
+            socket.emit('joinRoom', ROOM_ID);
+        });
+
+        // 2. The server tells us who we are when we join
+        socket.on('assignPlayerId', (id) => {
+            myPlayerId = id;
+            console.log("I am Player ID:", myPlayerId);
+            
+            // If I am NOT the first person here (Player 0), lock the menu settings!
+            if (myPlayerId !== 0) {
+                // 1. Lock the Play button
+                document.getElementById('startBtn').innerText = "WAITING FOR HOST...";
+                document.getElementById('startBtn').disabled = true;
+
+                // 2. Lock the Player Count (+ / -) buttons
+                document.getElementById('pDec').disabled = true;
+                document.getElementById('pInc').disabled = true;
+                document.getElementById('pDec').style.opacity = '0.5';
+                document.getElementById('pInc').style.opacity = '0.5';
+                document.getElementById('pDec').style.cursor = 'not-allowed';
+                document.getElementById('pInc').style.cursor = 'not-allowed';
+
+                // 3. Lock all Grid Size buttons
+                const gridBtns = document.querySelectorAll('.grid-btn');
+                gridBtns.forEach(btn => {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.5';
+                    btn.style.cursor = 'not-allowed';
+                });
+
+                // 4. Lock Custom Inputs
+                document.getElementById('customRows').disabled = true;
+                document.getElementById('customCols').disabled = true;
+            }
+        });
+
+        // 3. The server tells us the Host clicked PLAY
+        socket.on('gameStartedByHost', (data) => {
+            // Copy the host's grid size and player count
+            nextRows = data.rows;
+            nextCols = data.cols;
+            numPlayers = data.numPlayers;
+            
+            // Update the screen numbers to match the host
+            document.getElementById('playerCountDisplay').innerText = numPlayers;
+            
+            // Force the game to start on our screen
+            startGame(true); 
+        });
+
+        // 4. The server tells us someone made a move
+        socket.on('receiveMove', (data) => {
+            processMove(data.r, data.c);
+        });
+
+        // 5. Update the connection text when someone joins
+        socket.on('playerCountUpdate', (count) => {
+            const statusText = document.getElementById('connectionStatus');
+            if (statusText) {
+                statusText.innerText = `🟢 Connected: ${count}`;
+            }
+        }); 
+
+        // 6. If the server says the room is full, lock the screen
+        socket.on('roomFull', (maxLimit) => {
+            const statusText = document.getElementById('connectionStatus');
+            if (statusText) {
+                statusText.innerText = `🔴 Room is Full (Max ${maxLimit})`;
+                statusText.style.color = '#ef4444'; // Red color
+            }
+            // Disable the play button entirely
+            const startBtn = document.getElementById('startBtn');
+            startBtn.innerText = "ROOM FULL";
+            startBtn.disabled = true;
+            startBtn.style.opacity = '0.5';
+            
+            console.log("Could not join: Room is at max capacity.");
+        }); 
+
+        // 7. Listen for live lobby setting changes from the Host
+        socket.on('lobbyUpdated', (data) => {
+            if (myPlayerId !== 0) {
+                // 1. Sync Number of Players
+                numPlayers = data.numPlayers;
+                document.getElementById('playerCountDisplay').innerText = numPlayers;
+
+                // 2. Sync Grid Variables
+                nextRows = data.rows;
+                nextCols = data.cols;
+                isCustomGrid = data.isCustom;
+
+                // 3. Sync UI Grid Buttons Visually
+                const btns = document.querySelectorAll('.grid-btn');
+                btns.forEach(b => b.classList.remove('active'));
+                
+                if (isCustomGrid) {
+                    btns[3].classList.add('active'); // The "Custom" button
+                    document.getElementById('customGridInputs').classList.remove('hidden');
+                    document.getElementById('customRows').value = nextRows;
+                    document.getElementById('customCols').value = nextCols;
+                } else {
+                    document.getElementById('customGridInputs').classList.add('hidden');
+                    if (nextRows === 4) btns[0].classList.add('active');
+                    if (nextRows === 5) btns[1].classList.add('active');
+                    if (nextRows === 6) btns[2].classList.add('active');
+                }
+            }
+        });
+
+        // 8. If someone else clicked Undo, we need to undo on our screen too
+        socket.on('receiveUndo', () => {
+            // Pass 'true' so we don't accidentally send it back to the server in an infinite loop
+            undoMove(true); 
+        });
+
+        // 9. Listen for timeouts from other players
+        socket.on('receiveTimeoutSkip', () => {
+            processTimeout();
+        });
+
+        // -------------------------
+        let canvas, ctx;
+        let width, height;
+        // Grid Dimensions: Controlled by Selection
+        let rows = 6, cols = 6;
+        let nextRows = 6, nextCols = 6;
+        let isCustomGrid = false;
+        let isThickGrid = true; // BOLD BY DEFAULT
+
+        let cellSize;
+        let grid = [];
+        let players = [];
+        let numPlayers = 2;
+        let currentPlayerIndex = 0;
+        let isAnimating = false;
+        let projectiles = []; // Flying orbs during explosion
+        let particles = []; // Visual sparks/debris (purely cosmetic)
+        let gameActive = false;
+        let totalMoves = 0;
+        let checkWinCondition = false; // Don't check win until 1 full round
+        let animationFrameId;
+
+        // Timer Variables
+        let turnTimer = null;
+        let currentSeconds = 15;
+
+        // Undo History
+        let moveHistory = [];
+
+        // Elimination System
+        let eliminationQueue = [];
+        let isShowingElimination = false;
+
+        // DOM Elements
+        const menuOverlay = document.getElementById('menuOverlay');
+        const winnerOverlay = document.getElementById('winnerOverlay');
+        const winnerText = document.getElementById('winnerText');
+        const winnerIcon = document.getElementById('winnerIcon');
+        const playerCountDisplay = document.getElementById('playerCountDisplay');
+        const undoBtn = document.getElementById('undoBtn');
+        const thickGridBtn = document.getElementById('thickGridBtn');
+        const customGridInputs = document.getElementById('customGridInputs');
+        const gameControls = document.getElementById('gameControls');
+        const eliminationPopup = document.getElementById('eliminationPopup');
+        const eliminationText = document.getElementById('eliminationText');
+
+        /**
+         * Initialization
+         */
+        window.onload = () => {
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+
+            // Lock orientation to portrait if supported
+            if (screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('portrait').catch(err => {
+                    console.log("Orientation lock not supported:", err);
+                });
+            }
+
+            // UI Event Listeners
+            document.getElementById('pInc').onclick = () => updatePlayerCount(1);
+            document.getElementById('pDec').onclick = () => updatePlayerCount(-1);
+            document.getElementById('startBtn').onclick = startGame;
+            undoBtn.onclick = undoMove;
+
+            // Thick Grid Toggle Logic
+            thickGridBtn.onclick = () => {
+                isThickGrid = !isThickGrid;
+                if (isThickGrid) {
+                    thickGridBtn.classList.remove('opacity-70');
+                    thickGridBtn.classList.add('bg-blue-600', 'text-white', 'opacity-100');
+                } else {
+                    thickGridBtn.classList.add('opacity-70');
+                    thickGridBtn.classList.remove('bg-blue-600', 'text-white', 'opacity-100');
+                }
+            };
+
+            winnerOverlay.onclick = resetGameMenu;
+
+            window.addEventListener('resize', handleResize);
+            canvas.addEventListener('mousedown', handleInput);
+            canvas.addEventListener('touchstart', handleInput, { passive: false });
+            
+            // Ensure Custom Input handling
+            document.getElementById('customRows').addEventListener('change', (e) => {
+                nextRows = parseInt(e.target.value) || 9;
+                broadcastLobbyUpdate();
+            });
+            document.getElementById('customCols').addEventListener('change', (e) => {
+                nextCols = parseInt(e.target.value) || 6;
+                broadcastLobbyUpdate();
+            });
+
+            handleResize();
+            gameLoop();
+        };
+
+        // Helper function to tell the server when the Host changes a setting
+        function broadcastLobbyUpdate() {
+            if (myPlayerId === 0 && socket) {
+                socket.emit('lobbyUpdate', {
+                    roomId: ROOM_ID,
+                    numPlayers: numPlayers,
+                    rows: nextRows,
+                    cols: nextCols,
+                    isCustom: isCustomGrid
+                });
+            }
+        }
+        
+        // Grid Selection Logic
+        window.selectGrid = function (r, c, btn) {
+            nextRows = r;
+            nextCols = c;
+            isCustomGrid = false;
+            customGridInputs.classList.add('hidden');
+
+            updateGridButtons(btn);
+            broadcastLobbyUpdate();
+        }
+
+        window.toggleCustomGrid = function (btn) {
+            isCustomGrid = true;
+            customGridInputs.classList.remove('hidden');
+
+            // Read current input values
+            nextRows = parseInt(document.getElementById('customRows').value) || 9;
+            nextCols = parseInt(document.getElementById('customCols').value) || 6;
+
+            updateGridButtons(btn);
+            broadcastLobbyUpdate();
+        }
+
+        function updateGridButtons(activeBtn) {
+            document.querySelectorAll('.grid-btn').forEach(b => b.classList.remove('active'));
+            activeBtn.classList.add('active');
+        }
+
+        function updatePlayerCount(delta) {
+            numPlayers = Math.max(2, Math.min(8, numPlayers + delta));
+            playerCountDisplay.innerText = numPlayers;
+            broadcastLobbyUpdate(); 
+        }
+
+        function handleResize() {
+            const container = document.getElementById('game-container');
+            width = container.clientWidth;
+            height = container.clientHeight;
+
+            // High DPI Canvas
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = width * dpr;
+            canvas.height = height * dpr;
+            canvas.style.width = `${width}px`;
+            canvas.style.height = `${height}px`;
+            ctx.scale(dpr, dpr);
+
+            // Add margin around the grid
+            const margin = 20;
+            const availableWidth = width - (margin * 2);
+            const availableHeight = height - (margin * 2);
+
+            const cellW = availableWidth / cols;
+            const cellH = availableHeight / rows;
+
+            cellSize = Math.min(cellW, cellH);
+
+            // Center the grid
+            const gridW = cols * cellSize;
+            const gridH = rows * cellSize;
+            ctx.translate((width - gridW) / 2, (height - gridH) / 2);
+
+            // Store offset for input calculation
+            canvas.offsetX = (width - gridW) / 2;
+            canvas.offsetY = (height - gridH) / 2;
+        }
+
+        function startGame(isFromHostBroadcast) {
+            // FIX: If the browser passed a MouseEvent from a click, ignore it and set to false
+            if (typeof isFromHostBroadcast !== 'boolean') {
+                isFromHostBroadcast = false;
+            }
+
+            // If I am the host and I clicked play, tell the server to start the game for others
+            if (myPlayerId === 0 && isFromHostBroadcast === false) {
+                socket.emit('hostStartedGame', {
+                    roomId: ROOM_ID,
+                    rows: nextRows,
+                    cols: nextCols,
+                    numPlayers: numPlayers
+                });
+            }
+
+            // Apply selected grid settings
+            if (isCustomGrid) {
+                nextRows = Math.max(2, Math.min(20, parseInt(document.getElementById('customRows').value)));
+                nextCols = Math.max(2, Math.min(20, parseInt(document.getElementById('customCols').value)));
+            }
+            rows = nextRows;
+            cols = nextCols;
+            
+            handleResize();
+
+            menuOverlay.classList.add('hidden');
+            // Show game controls
+            gameControls.classList.remove('hidden');
+
+            // Initialize Players
+            players = [];
+            for (let i = 0; i < numPlayers; i++) {
+                players.push({
+                    id: i,
+                    color: COLORS[i].main,
+                    glow: COLORS[i].glow,
+                    alive: true,
+                    timeLimit: 15 // NEW: Give everyone 15 seconds to start
+                });
+            }
+
+            // Initialize Grid
+            grid = [];
+            for (let r = 0; r < rows; r++) {
+                let row = [];
+                for (let c = 0; c < cols; c++) {
+                    let capacity = 0;
+                    if (r > 0) capacity++;
+                    if (r < rows - 1) capacity++;
+                    if (c > 0) capacity++;
+                    if (c < cols - 1) capacity++;
+
+                    row.push({
+                        r, c,
+                        count: 0,
+                        owner: null,
+                        capacity: capacity
+                    });
+                }
+                grid.push(row);
+            }
+
+            currentPlayerIndex = 0;
+            totalMoves = 0;
+            gameActive = true;
+            checkWinCondition = false;
+            projectiles = [];
+            moveHistory = []; // Reset history
+            eliminationQueue = [];
+            isShowingElimination = false;
+            updateUndoUI();
+            startTimer(); // Starts the clock for Player 1!
+        }
+
+        function resetGameMenu() {
+            gameActive = false;
+            winnerOverlay.classList.add('hidden');
+            menuOverlay.classList.remove('hidden');
+            // Hide game controls
+            gameControls.classList.add('hidden');
+            undoBtn.disabled = true;
+            eliminationPopup.classList.add('hidden');
+        }
+
+        /**
+         * Undo Logic
+         */
+        function saveState() {
+            // Deep copy grid
+            const gridCopy = grid.map(row => row.map(cell => ({ ...cell })));
+            const playersCopy = players.map(p => ({ ...p }));
+
+            const state = {
+                grid: gridCopy,
+                players: playersCopy,
+                currentPlayerIndex,
+                totalMoves,
+                checkWinCondition
+            };
+
+            moveHistory.push(state);
+            if (moveHistory.length > 50) moveHistory.shift(); // Limit history to last 50 moves
+            updateUndoUI();
+        }
+        
+        function undoMove(isFromServer) {
+            // Protect against browser click events
+            if (typeof isFromServer !== 'boolean') {
+                isFromServer = false;
+            }
+
+            if (isAnimating || moveHistory.length === 0 || !gameActive) return;
+
+            const previousState = moveHistory.pop();
+
+            grid = previousState.grid;
+            players = previousState.players;
+            currentPlayerIndex = previousState.currentPlayerIndex;
+            totalMoves = previousState.totalMoves;
+            checkWinCondition = previousState.checkWinCondition;
+
+            updateUndoUI();
+            startTimer(); // Restart the clock for the undone turn!
+
+            // NEW: If I clicked the button myself, tell the server to broadcast it!
+            if (isFromServer === false && socket) {
+                socket.emit('requestUndo', { roomId: ROOM_ID });
+            }
+        }
+
+        function updateUndoUI() {
+            undoBtn.disabled = moveHistory.length === 0 || isAnimating;
+            undoBtn.style.opacity = (moveHistory.length === 0 || isAnimating) ? '0.3' : '1';
+        }
+
+        /**
+         * Game Logic
+         */
+
+        // Controls the "Your Turn" banner and countdown
+        function updateTurnIndicator() {
+            const indicator = document.getElementById('turnIndicator');
+            
+            // Hide it if game is over or animating
+            if (!gameActive || isAnimating) {
+                indicator.classList.add('hidden');
+                return;
+            }
+
+            const p = players[currentPlayerIndex];
+            if (p) {
+                indicator.style.backgroundColor = p.color;
+                indicator.style.boxShadow = `0 0 20px ${p.glow}`;
+                indicator.style.color = (p.id === 2 || p.id === 5) ? 'black' : 'white'; 
+                
+                // Show everyone the timer, but personalize the text
+                if (currentPlayerIndex === myPlayerId) {
+                    indicator.innerText = `YOUR TURN (${currentSeconds}s)`;
+                } else {
+                    indicator.innerText = `${COLORS[p.id].name} (${currentSeconds}s)`;
+                }
+                
+                indicator.classList.remove('hidden');
+            }
+        }
+
+        // Starts the countdown clock
+        function startTimer() {
+            clearInterval(turnTimer); // Reset any existing clock
+            if (!gameActive || isAnimating) return;
+
+            currentSeconds = players[currentPlayerIndex].timeLimit;
+            updateTurnIndicator(); // Instantly show starting time
+
+            turnTimer = setInterval(() => {
+                currentSeconds--;
+                updateTurnIndicator();
+
+                if (currentSeconds <= 0) {
+                    clearInterval(turnTimer);
+                    // Only the active player sends the skip request so it doesn't double-trigger
+                    if (currentPlayerIndex === myPlayerId && socket) {
+                        socket.emit('timeoutSkip', { roomId: ROOM_ID });
+                        processTimeout(); // Do it locally too
+                    }
+                }
+            }, 1000); // Ticks every 1 second
+        }
+
+        // Handles the penalty and skipping the turn
+        function processTimeout() {
+            clearInterval(turnTimer);
+            if (!gameActive || isAnimating) return;
+
+            // Penalty logic: Decrease their future time limit
+            let p = players[currentPlayerIndex];
+            if (p.timeLimit === 15) p.timeLimit = 10;
+            else if (p.timeLimit === 10) p.timeLimit = 5;
+
+            // Skip them and start the next person's clock
+            nextTurn();
+            startTimer();
+        }
+
+        function handleInput(e) {
+            if (!gameActive || isAnimating) return;
+            
+            if (currentPlayerIndex !== myPlayerId) {
+                console.log("Not your turn!");
+                return; 
+            }
+
+            if (e.type === 'touchstart') e.preventDefault();
+
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+            const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+
+            const x = clientX - rect.left - canvas.offsetX;
+            const y = clientY - rect.top - canvas.offsetY;
+
+            if (x < 0 || y < 0) return;
+
+            const c = Math.floor(x / cellSize);
+            const r = Math.floor(y / cellSize);
+
+            if (r >= 0 && r < rows && c >= 0 && c < cols) {
+                attemptMove(r, c);
+            }
+        }
+
+        function attemptMove(r, c) {
+            const cell = grid[r][c];
+
+            // Only allow the move if it's valid
+            if (cell.owner === null || cell.owner === currentPlayerIndex) {
+                // 1. Tell the server we made a move!
+                socket.emit('makeMove', { roomId: ROOM_ID, r: r, c: c });
+                
+                // 2. Process our own move locally
+                processMove(r, c);
+            }
+        }
+
+        // This function actually does the game logic
+        function processMove(r, c) {
+            clearInterval(turnTimer); // Stop the clock immediately!
+            
+            const cell = grid[r][c];
+            
+            players[currentPlayerIndex].timeLimit = 15; // Reset their future time back to 15s because they acted!
+            
+            saveState(); 
+            cell.owner = currentPlayerIndex;
+            cell.count++;
+            totalMoves++;
+
+            updateUndoUI(); 
+            resolveState();
+        }
+
+        function resolveState() {
+            // === Check for immediate winner ===
+            if (checkWinCondition) {
+                const activeOwners = new Set();
+                for (let r = 0; r < rows; r++) {
+                    for (let c = 0; c < cols; c++) {
+                        if (grid[r][c].owner !== null) {
+                            activeOwners.add(grid[r][c].owner);
+                        }
+                    }
+                }
+
+                if (activeOwners.size === 1) {
+                    // IMMEDIATE WIN DECLARATION
+                    isAnimating = false;
+                    projectiles = []; // Clear any remaining flying dots
+                    const winnerId = activeOwners.values().next().value;
+                    declareWinner(winnerId);
+                    return; // Stop recursion
+                }
+            }
+
+            // Find unstable cells
+            let unstable = [];
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    if (grid[r][c].count >= grid[r][c].capacity) {
+                        unstable.push(grid[r][c]);
+                    }
+                }
+            }
+
+            if (unstable.length > 0) {
+                isAnimating = true;
+                clearInterval(turnTimer); // Pause clock while exploding!
+                updateUndoUI(); // Keep undo disabled
+                updateTurnIndicator();
+
+                unstable.forEach(cell => {
+                    cell.count -= cell.capacity;
+                    if (cell.count === 0) cell.owner = null;
+                    explodeCell(cell);
+                });
+
+            } else {
+                isAnimating = false;
+                updateUndoUI(); // Re-enable undo
+
+                // Logic check after animations settle
+                if (checkWinCondition) {
+                    checkEliminations();
+                }
+
+                if (gameActive) {
+                    nextTurn();
+                    startTimer(); // Start the clock for the next player!
+                }
+            }
+        }
+
+        function checkEliminations() {
+            if (!gameActive) return;
+
+            // Count orbs for each player
+            const orbCounts = new Array(numPlayers).fill(0);
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    if (grid[r][c].owner !== null) {
+                        orbCounts[grid[r][c].owner]++;
+                    }
+                }
+            }
+
+            // Check if any previously alive player is now at 0 orbs
+            players.forEach(p => {
+                if (p.alive && orbCounts[p.id] === 0) {
+                    p.alive = false;
+                    eliminationQueue.push(p.id);
+                }
+            });
+
+            processEliminationQueue();
+        }
+
+        function processEliminationQueue() {
+            if (isShowingElimination || eliminationQueue.length === 0) return;
+
+            isShowingElimination = true;
+            const playerId = eliminationQueue.shift();
+            showEliminationPopup(playerId);
+        }
+
+        function showEliminationPopup(playerId) {
+            const p = players[playerId];
+            eliminationText.innerText = `${COLORS[playerId].name} ELIMINATED`;
+            eliminationText.style.color = p.main;
+            eliminationPopup.style.borderColor = p.main;
+            eliminationPopup.style.boxShadow = `0 0 30px ${p.glow}`;
+
+            eliminationPopup.classList.remove('hidden');
+            eliminationPopup.classList.remove('animate-elimination'); // Reset animation
+            void eliminationPopup.offsetWidth; // Trigger reflow
+            eliminationPopup.classList.add('animate-elimination');
+
+            // Hide after 1s and process next
+            setTimeout(() => {
+                eliminationPopup.classList.add('hidden');
+                isShowingElimination = false;
+                // Check if there are more in queue
+                if (eliminationQueue.length > 0) {
+                    processEliminationQueue();
+                }
+            }, 1000);
+        }
+
+        function explodeCell(cell) {
+            const neighbors = [
+                { r: cell.r - 1, c: cell.c },
+                { r: cell.r + 1, c: cell.c },
+                { r: cell.r, c: cell.c - 1 },
+                { r: cell.r, c: cell.c + 1 }
+            ];
+
+            neighbors.forEach(n => {
+                if (n.r >= 0 && n.r < rows && n.c >= 0 && n.c < cols) {
+                    projectiles.push({
+                        startX: cell.c * cellSize + cellSize / 2,
+                        startY: cell.r * cellSize + cellSize / 2,
+                        targetR: n.r,
+                        targetC: n.c,
+                        targetX: n.c * cellSize + cellSize / 2,
+                        targetY: n.r * cellSize + cellSize / 2,
+                        progress: 0,
+                        owner: currentPlayerIndex
+                    });
+                }
+            });
+        }
+
+        function nextTurn() {
+            // Enable win checking after everyone has played roughly once
+            if (!checkWinCondition && totalMoves >= numPlayers) {
+                checkWinCondition = true;
+            }
+
+            let loopCount = 0;
+            do {
+                currentPlayerIndex = (currentPlayerIndex + 1) % numPlayers;
+                loopCount++;
+            } while (!players[currentPlayerIndex].alive && loopCount < numPlayers + 1);
+
+        }
+
+        function declareWinner(playerId) {
+            gameActive = false;
+            clearInterval(turnTimer); // Stop clock when game ends!
+            const p = players[playerId];
+            // Keep color name for winner as requested previously
+            winnerText.innerText = `${COLORS[playerId].name} WON!`;
+            winnerIcon.style.backgroundColor = p.color;
+            winnerIcon.style.color = 'black'; /* Changed text to black for better contrast on light winner colors like White/Yellow */
+            winnerIcon.style.borderColor = p.color;
+            winnerIcon.style.boxShadow = `0 0 50px ${p.glow}`;
+            winnerOverlay.classList.remove('hidden');
+            undoBtn.disabled = true;
+            updateTurnIndicator();
+        }
+
+        /**
+         * Rendering & Animation Loop
+         */
+        function gameLoop() {
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.restore();
+
+            if (!gameActive && projectiles.length === 0) {
+                if (grid.length > 0) {
+                    drawGrid();
+                }
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+
+            drawHighlights(); // Add highlights before grid lines
+            drawGrid();
+            updateAndDrawProjectiles();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function drawHighlights() {
+            if (!gameActive) return;
+
+            const activePlayer = players[currentPlayerIndex];
+            if (!activePlayer) return;
+
+            ctx.fillStyle = activePlayer.main;
+            ctx.globalAlpha = 0.15; // Very subtle light shade
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const cell = grid[r][c];
+                    // Highlight only cells owned by the current player as requested
+                    // "empty grids should remain same"
+                    if (cell.owner === currentPlayerIndex) {
+                        ctx.fillRect(cell.c * cellSize, cell.r * cellSize, cellSize, cellSize);
+                    }
+                }
+            }
+
+            ctx.globalAlpha = 1.0; // Reset alpha
+        }
+
+        function drawGrid() {
+            // Dynamic line width based on toggle
+            ctx.lineWidth = isThickGrid ? 3 : 1;
+
+            if (gameActive && players[currentPlayerIndex]) {
+                const c = players[currentPlayerIndex].color;
+                ctx.strokeStyle = c;
+                // If thick grid is on, we might want it slightly more opaque to pop, or keep it subtle
+                ctx.globalAlpha = isThickGrid ? 0.6 : 0.4;
+                ctx.shadowBlur = 10; // Increased blur for grid lines
+                ctx.shadowColor = c;
+            } else {
+                ctx.strokeStyle = '#333';
+                ctx.globalAlpha = 1.0;
+                ctx.shadowBlur = 0;
+            }
+
+            ctx.beginPath();
+            for (let r = 0; r <= rows; r++) {
+                ctx.moveTo(0, r * cellSize);
+                ctx.lineTo(cols * cellSize, r * cellSize);
+            }
+            for (let c = 0; c <= cols; c++) {
+                ctx.moveTo(c * cellSize, 0);
+                ctx.lineTo(c * cellSize, rows * cellSize);
+            }
+            ctx.stroke();
+
+            ctx.globalAlpha = 1.0;
+            ctx.shadowBlur = 0;
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    drawCell(grid[r][c]);
+                }
+            }
+        }
+
+        function drawCell(cell) {
+            if (cell.count === 0) return;
+
+            let cx = cell.c * cellSize + cellSize / 2;
+            let cy = cell.r * cellSize + cellSize / 2;
+
+            // Shake effect for critical mass (one orb away from explosion)
+            if (cell.count === cell.capacity - 1) {
+                const shakeIntensity = cellSize * 0.05; // 5% of cell size
+                cx += (Math.random() - 0.5) * shakeIntensity;
+                cy += (Math.random() - 0.5) * shakeIntensity;
+            }
+
+            const color = players[cell.owner].color;
+
+            ctx.fillStyle = color;
+
+            // Only glow if it's the owner's turn
+            if (cell.owner === currentPlayerIndex) {
+                ctx.shadowBlur = 30;
+                ctx.shadowColor = color;
+            } else {
+                ctx.shadowBlur = 0;
+                ctx.shadowColor = 'transparent';
+            }
+
+            const time = Date.now() * 0.002;
+            const offset = (cell.r * cols + cell.c) * 0.5;
+            const orbSize = cellSize * ORB_RADIUS_RATIO;
+
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(time + offset);
+
+            if (cell.count === 1) {
+                ctx.beginPath();
+                ctx.arc(0, 0, orbSize, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (cell.count === 2) {
+                ctx.beginPath();
+                ctx.arc(-orbSize, 0, orbSize, 0, Math.PI * 2);
+                ctx.arc(orbSize, 0, orbSize, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (cell.count >= 3) {
+                for (let i = 0; i < 3; i++) {
+                    const angle = (Math.PI * 2 / 3) * i;
+                    const dist = orbSize;
+                    ctx.beginPath();
+                    ctx.arc(Math.cos(angle) * dist, Math.sin(angle) * dist, orbSize, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            ctx.restore();
+            ctx.shadowBlur = 0;
+        }
+
+        function updateAndDrawProjectiles() {
+            if (projectiles.length === 0) return;
+
+            let arrivalOccurred = false;
+
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                let p = projectiles[i];
+                p.progress += ANIMATION_SPEED;
+
+                if (p.progress >= 1) {
+                    const targetCell = grid[p.targetR][p.targetC];
+                    targetCell.owner = p.owner;
+                    targetCell.count++;
+
+                    projectiles.splice(i, 1);
+                    arrivalOccurred = true;
+                } else {
+                    const currX = p.startX + (p.targetX - p.startX) * p.progress;
+                    const currY = p.startY + (p.targetY - p.startY) * p.progress;
+
+                    ctx.fillStyle = players[p.owner].color;
+                    ctx.shadowColor = players[p.owner].color; // Stronger glow
+                    ctx.shadowBlur = 20; // Stronger blur
+                    ctx.beginPath();
+                    ctx.arc(currX, currY, cellSize * 0.15, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                }
+            }
+
+            if (arrivalOccurred && projectiles.length === 0) {
+                setTimeout(() => {
+                    resolveState();
+                }, 50);
+            }
+        }
+    </script>
+</body>
+
+</html>
