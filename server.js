@@ -137,6 +137,11 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
     console.log("WARNING: Telegram Bot is NOT running. Please replace 'YOUR_BOT_TOKEN_HERE' with your real token.");
 }
 
+const PORT = process.env.PORT || 3000;
+// We add '0.0.0.0' so Render's port scanner instantly detects it!
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server is running on port ${PORT}`);
+});
 
 
 
