@@ -71,7 +71,7 @@ io.on('connection', (socket) => {
 const token = '8508348463:AAGlD368tiBlU6u7p1uFLFHbqAtDpeUADFA'; 
 
 // !!! REPLACE THIS WITH YOUR FUTURE GLITCH URL (e.g., https://my-atomic-game.glitch.me) !!!
-const GAME_URL = 'https://atomic-blast.onrender.com'; 
+const GAME_URL = 'https://atomic-blast.onrender.com/'; 
 
 if (token !== 'YOUR_BOT_TOKEN_HERE') {
     const bot = new TelegramBot(token, { polling: true });
@@ -111,3 +111,4 @@ server.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 
 });
+
