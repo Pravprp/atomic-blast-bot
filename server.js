@@ -109,6 +109,7 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
                 id: query.id, // FIX 2: Use a unique ID so Telegram doesn't get confused
                 title: 'Play Atomic Blast!',
                 description: 'Click to drop a game button in this chat.',
+                thumbnail_url: 'https://raw.githubusercontent.com/Pravprp/atomic-blast-bot/refs/heads/main/Image.png',
                 input_message_content: {
                     message_text: '💥 **Atomic Blast**\nI challenge you to a multiplayer match! Click the button below to join the lobby.',
                     parse_mode: 'Markdown'
@@ -142,6 +143,7 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
 });
+
 
 
 
