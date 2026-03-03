@@ -979,6 +979,7 @@
          * Game Logic
          */
 
+        
         // Controls the "Your Turn" banner and countdown
         function updateTurnIndicator() {
             const indicator = document.getElementById('turnIndicator');
@@ -995,11 +996,14 @@
                 indicator.style.boxShadow = `0 0 20px ${p.glow}`;
                 indicator.style.color = (p.id === 2 || p.id === 5) ? 'black' : 'white'; 
                 
+                // Keep the UI showing 0s even if the internal backup clock goes negative
+                const displaySeconds = Math.max(0, currentSeconds);
+
                 // Show everyone the timer, but personalize the text
                 if (currentPlayerIndex === myPlayerId) {
-                    indicator.innerText = `YOUR TURN (${currentSeconds}s)`;
+                    indicator.innerText = `YOUR TURN (${displaySeconds}s)`;
                 } else {
-                    indicator.innerText = `${COLORS[p.id].name} (${currentSeconds}s)`;
+                    indicator.innerText = `${COLORS[p.id].name} (${displaySeconds}s)`;
                 }
                 
                 indicator.classList.remove('hidden');
@@ -1018,17 +1022,30 @@
                 currentSeconds--;
                 updateTurnIndicator();
 
-                if (currentSeconds <= 0) {
-                    clearInterval(turnTimer);
-                    // Only the active player sends the skip request so it doesn't double-trigger
+                // 1. Normal AFK: If the app is open, the active player skips themselves at exactly 0.
+                if (currentSeconds === 0) {
                     if (currentPlayerIndex === myPlayerId && socket) {
+                        clearInterval(turnTimer);
                         socket.emit('timeoutSkip', { roomId: ROOM_ID });
-                        processTimeout(); // Do it locally too
+                        processTimeout();
+                    }
+                } 
+                // 2. App Closed (Ghost Player): If the player swiped the app away, their clock is dead.
+                // We use a "cascading" backup timer. Player 0 acts as referee at -3s, Player 1 at -4s, etc.
+                else if (currentSeconds < 0) {
+                    const backupTriggerTime = -3 - myPlayerId; 
+                    
+                    if (currentSeconds === backupTriggerTime) {
+                        clearInterval(turnTimer);
+                        console.log(`Active player completely disconnected! Player ${myPlayerId} is forcing the skip.`);
+                        if (socket) {
+                            socket.emit('timeoutSkip', { roomId: ROOM_ID });
+                            processTimeout();
+                        }
                     }
                 }
             }, 1000); // Ticks every 1 second
         }
-
         // Handles the penalty and skipping the turn
         function processTimeout() {
             clearInterval(turnTimer);
@@ -1450,5 +1467,6 @@
         }
     </script>
 </body>
+
 
 </html>
