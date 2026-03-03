@@ -108,21 +108,21 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
 
         const results = [
             {
-                // 1. Change type to 'photo' to drop a big image in the chat
-                type: 'photo',
+                // 1. Change back to 'article' so it sends INSTANTLY when tapped
+                type: 'article',
                 id: query.id, 
                 title: 'Play Atomic Blast!',
+                description: 'Click to instantly drop the game in this chat.',
                 
-                // 2. This is the BIG image that appears inside the chat bubble
-                photo_url: 'https://raw.githubusercontent.com/Pravprp/atomic-blast-bot/refs/heads/main/Image.png',
-                
-                // 3. This is the SMALL image that appears in the popup menu
+                // 2. This keeps your nice logo in the popup menu
                 thumbnail_url: 'https://raw.githubusercontent.com/Pravprp/atomic-blast-bot/refs/heads/main/Image.png',
                 
-                // 4. We change 'input_message_content' to 'caption' so the text sits under the picture
-                caption: '💥 **Atomic Blast**\nI challenge you to a multiplayer match! Click the button below to join the lobby.',
-                parse_mode: 'Markdown',
-                
+                input_message_content: {
+                    // 3. THE TRICK: We put a blank space [ ] next to the image link. 
+                    // This hides the raw text link from your friends, but forces Telegram to generate a massive image preview!
+                    message_text: '[ ](https://raw.githubusercontent.com/Pravprp/atomic-blast-bot/refs/heads/main/Image.png)💥 **Atomic Blast**\nI challenge you to a multiplayer match! Click the button below to join the lobby.',
+                    parse_mode: 'Markdown'
+                },
                 reply_markup: {
                     inline_keyboard: [[
                         {
@@ -152,6 +152,7 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
 });
+
 
 
 
