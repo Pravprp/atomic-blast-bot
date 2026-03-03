@@ -14,7 +14,10 @@ app.use(express.static(__dirname));
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
-
+// NEW: A lightweight backdoor just for UptimeRobot!
+app.get('/ping', (req, res) => {
+    res.status(200).send('I am awake!');
+});
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: { origin: "*", methods: ["GET", "POST"] }
@@ -143,6 +146,7 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
 });
+
 
 
 
