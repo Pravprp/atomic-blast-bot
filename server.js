@@ -4,20 +4,22 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
 const TelegramBot = require('node-telegram-bot-api');
+const https = require('https'); // Required for the auto-ping system
 
 const app = express();
 app.use(cors());
-
 
 // Serve the HTML file directly from the server
 app.use(express.static(__dirname));
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
-// NEW: A lightweight backdoor just for UptimeRobot!
+
+// A lightweight backdoor just for keeping the server awake!
 app.get('/ping', (req, res) => {
     res.status(200).send('I am awake!');
 });
+
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: { origin: "*", methods: ["GET", "POST"] }
@@ -38,7 +40,10 @@ io.on('connection', (socket) => {
 
         // DYNAMIC CHECK: Is the room full based on the Host's current setting?
         if (rooms[roomId].players.length >= rooms[roomId].maxPlayers) {
-            console.log(`Player ${socket.id} tried to join ${roomId}, but it is full (Max: ${rooms[roomId].maxPlayers}).`);
+            console.log(`Player ${socket.id} joined ${roomId} as a SPECTATOR.`);
+            
+            // NEW: Let them join the socket room so they can watch the live moves!
+            socket.join(roomId); 
             socket.emit('roomFull', rooms[roomId].maxPlayers); 
             return; 
         }
@@ -52,6 +57,21 @@ io.on('connection', (socket) => {
         socket.emit('assignPlayerId', myPlayerId);
         io.to(roomId).emit('playerCountUpdate', rooms[roomId].players.length);
     });
+
+    // --- NEW: SPECTATOR STATE SYNC ---
+    socket.on('requestGameState', (roomId) => {
+        // The spectator asks the Host (Player 0) for a picture of the current board
+        if (rooms[roomId] && rooms[roomId].players.length > 0) {
+            const hostId = rooms[roomId].players[0]; 
+            io.to(hostId).emit('hostPleaseSendState', socket.id);
+        }
+    });
+
+    socket.on('hostRepliedWithState', (data) => {
+        // Send the board state specifically to the spectator who asked for it
+        io.to(data.spectatorId).emit('spectatorCatchUp', data.state);
+    });
+    // ---------------------------------
 
     socket.on('hostStartedGame', (data) => {
         console.log(`Game started in room ${data.roomId} with ${data.numPlayers} players`);
@@ -144,18 +164,20 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
     console.log("WARNING: Telegram Bot is NOT running. Please replace 'YOUR_BOT_TOKEN_HERE' with your real token.");
 }
 
+// --- AUTO PING TO PREVENT SLEEP ---
+// This automatically hits your /ping route every 14 minutes
+setInterval(() => {
+    https.get(GAME_URL + '/ping', (res) => {
+        if (res.statusCode === 200) {
+            console.log("Self-ping successful. Keeping the server awake.");
+        }
+    }).on('error', (err) => {
+        console.error("Self-ping failed:", err.message);
+    });
+}, 840000); 
+
 const PORT = process.env.PORT || 3000;
 // We add '0.0.0.0' so Render's port scanner instantly detects it!
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
 });
-
-
-
-
-
-
-
-
-
-
