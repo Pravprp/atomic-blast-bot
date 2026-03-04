@@ -607,21 +607,92 @@
             }
         }); 
 
-        // 6. If the server says the room is full, lock the screen
+        // --- NEW: 6. SPECTATOR MODE LOGIC ---
+        // If the server says the room is full, activate SPECTATOR mode
         socket.on('roomFull', (maxLimit) => {
             const statusText = document.getElementById('connectionStatus');
             if (statusText) {
-                statusText.innerText = `🔴 Room is Full (Max ${maxLimit})`;
-                statusText.style.color = '#ef4444'; // Red color
+                statusText.innerText = `👁️ Spectating (Max ${maxLimit} Players)`;
+                statusText.style.color = '#facc15'; // Yellow color
             }
-            // Disable the play button entirely
-            const startBtn = document.getElementById('startBtn');
-            startBtn.innerText = "ROOM FULL";
-            startBtn.disabled = true;
-            startBtn.style.opacity = '0.5';
+
+            myPlayerId = 'spectator'; // Lock them out of making moves
+
+            // Disable all settings UI
+            document.getElementById('pDec').disabled = true;
+            document.getElementById('pInc').disabled = true;
+            document.querySelectorAll('.grid-btn').forEach(btn => {
+                btn.disabled = true;
+                btn.style.opacity = '0.5';
+                btn.style.cursor = 'not-allowed';
+            });
+            document.getElementById('customRows').disabled = true;
+            document.getElementById('customCols').disabled = true;
             
-            console.log("Could not join: Room is at max capacity.");
+            // Turn Play button into Spectate button
+            const startBtn = document.getElementById('startBtn');
+            startBtn.innerText = "SPECTATE MATCH";
+            startBtn.disabled = false; // Re-enable it!
+            startBtn.style.opacity = '1';
+            
+            // Ask the Host for the current board state when clicked
+            startBtn.onclick = () => {
+                startBtn.innerText = "LOADING BOARD...";
+                socket.emit('requestGameState', ROOM_ID);
+            };
         }); 
+
+        // The Host receives this invisibly in the background
+        socket.on('hostPleaseSendState', (spectatorSocketId) => {
+            if (myPlayerId === 0) { // Only the Host replies
+                const currentState = {
+                    rows: rows,
+                    cols: cols,
+                    numPlayers: numPlayers,
+                    grid: grid,
+                    players: players,
+                    currentPlayerIndex: currentPlayerIndex,
+                    gameActive: gameActive,
+                    currentSeconds: currentSeconds,
+                    moveHistory: moveHistory // Share history so undo works for spectators!
+                };
+                socket.emit('hostRepliedWithState', { spectatorId: spectatorSocketId, state: currentState });
+            }
+        });
+
+        // The Spectator receives the board state from the Host
+        socket.on('spectatorCatchUp', (state) => {
+            if (state.gameActive) {
+                // Game is running! Copy everything to the spectator's screen
+                rows = state.rows;
+                cols = state.cols;
+                numPlayers = state.numPlayers;
+                grid = state.grid;
+                players = state.players;
+                currentPlayerIndex = state.currentPlayerIndex;
+                gameActive = state.gameActive;
+                currentSeconds = state.currentSeconds;
+                moveHistory = state.moveHistory;
+
+                handleResize(); // Draw the correct grid size
+                menuOverlay.classList.add('hidden'); // Hide the menu
+                gameControls.classList.remove('hidden');
+                updateTurnIndicator();
+                
+                // Run a dummy clock for the spectator just to see time tick down
+                clearInterval(turnTimer);
+                turnTimer = setInterval(() => {
+                    currentSeconds--;
+                    updateTurnIndicator();
+                }, 1000);
+            } else {
+                // Game hasn't started yet. Let them wait in the lobby!
+                const startBtn = document.getElementById('startBtn');
+                startBtn.innerText = "WAITING FOR HOST...";
+                startBtn.disabled = true;
+            }
+        });
+        // ------------------------------------
 
         // 7. Listen for live lobby setting changes from the Host
         socket.on('lobbyUpdated', (data) => {
@@ -1067,6 +1138,7 @@
         function handleInput(e) {
             if (!gameActive || isAnimating) return;
             
+            // Spectators and players out of turn get blocked here
             if (currentPlayerIndex !== myPlayerId) {
                 console.log("Not your turn!");
                 return; 
@@ -1470,7 +1542,4 @@
         }
     </script>
 </body>
-
-
 </html>
-
