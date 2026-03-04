@@ -600,10 +600,27 @@
         });
 
         // 5. Update the connection text when someone joins
+        let connectedPlayersCount = 1; // Track the exact number of players
+        
         socket.on('playerCountUpdate', (count) => {
+            connectedPlayersCount = count;
             const statusText = document.getElementById('connectionStatus');
             if (statusText) {
                 statusText.innerText = `🟢 Connected: ${count}`;
+            }
+
+            // NEW: If I am the Host, lock the play button until someone else joins!
+            if (myPlayerId === 0) {
+                const startBtn = document.getElementById('startBtn');
+                if (count < 2) {
+                    startBtn.innerText = "WAITING FOR PLAYERS...";
+                    startBtn.disabled = true;
+                    startBtn.style.opacity = '0.5';
+                } else {
+                    startBtn.innerText = "PLAY";
+                    startBtn.disabled = false;
+                    startBtn.style.opacity = '1';
+                }
             }
         }); 
 
@@ -917,6 +934,11 @@
             // FIX: If the browser passed a MouseEvent from a click, ignore it and set to false
             if (typeof isFromHostBroadcast !== 'boolean') {
                 isFromHostBroadcast = false;
+            }
+
+            // NEW: Hard block to completely prevent the Host from starting alone
+            if (myPlayerId === 0 && isFromHostBroadcast === false && connectedPlayersCount < 2) {
+                return; // Stop the function completely!
             }
 
             // If I am the host and I clicked play, tell the server to start the game for others
