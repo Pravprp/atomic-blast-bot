@@ -9,9 +9,6 @@ const https = require('https'); // Required for the auto-ping system
 const app = express();
 app.use(cors());
 
-// NEW: This is required for Webhooks so Express can read Telegram's messages
-app.use(express.json());
-
 // Serve the HTML file directly from the server
 app.use(express.static(__dirname));
 app.get('/', (req, res) => {
@@ -135,7 +132,7 @@ const GAME_URL = 'https://atomic-blast.onrender.com';
 console.log("DEBUG - Token check:", token ? token.substring(0, 5) + "******" : "UNDEFINED!");
 
 if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
-    // FIX 1: We go back to Polling. It is 100% reliable and fixes the "not responding" bug!
+    // We go back to Polling. It is 100% reliable and fixes the "not responding" bug!
     const bot = new TelegramBot(token, { polling: true });
 
     bot.deleteWebHook().catch(console.error);
@@ -149,7 +146,7 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
 
         const results = [
             {
-                // FIX 2 & 3: We switch back to 'article'. This completely kills the Privacy Popup and the Share Screen!
+                // We switch back to 'article'. This completely kills the Privacy Popup and the Share Screen!
                 type: 'article',
                 id: query.id, 
                 title: 'Play Atomic Blast!',
@@ -175,15 +172,17 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
         
         bot.answerInlineQuery(query.id, results, { cache_time: 0 }).catch(err => {
             console.error("\n[BOT ERROR] Telegram rejected the query!");
+            console.error("Reason:", err.response ? err.response.body : err.message);
         });
     });
     
     console.log("Telegram Bot logic initialized in Stealth Mode!");
 } else {
-    console.log("WARNING: Telegram Bot is NOT running.");
+    console.log("WARNING: Telegram Bot is NOT running. Please replace 'YOUR_BOT_TOKEN_HERE' with your real token.");
 }
 
 // --- AUTO PING TO PREVENT SLEEP ---
+// This automatically hits your /ping route every 14 minutes
 setInterval(() => {
     https.get(GAME_URL + '/ping', (res) => {
         if (res.statusCode === 200) {
@@ -195,7 +194,7 @@ setInterval(() => {
 }, 840000); 
 
 const PORT = process.env.PORT || 3000;
+// We add '0.0.0.0' so Render's port scanner instantly detects it!
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
 });
-
