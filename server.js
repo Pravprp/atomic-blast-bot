@@ -4,7 +4,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
 const TelegramBot = require('node-telegram-bot-api');
-const https = require('https'); // Required for the auto-ping system
+const https = require('https'); 
 
 const app = express();
 app.use(cors());
@@ -15,7 +15,7 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// A lightweight backdoor just for keeping the server awake!
+// A lightweight backdoor just for keeping the server awake
 app.get('/ping', (req, res) => {
     res.status(200).send('I am awake!');
 });
@@ -23,10 +23,9 @@ app.get('/ping', (req, res) => {
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: { origin: "*", methods: ["GET", "POST"] },
-    cookie: false // Prove to Telegram you are setting NO cookies!
+    cookie: false 
 });
 
-// We will store basic room info here
 const rooms = {};
 
 // --- MULTIPLAYER GAME LOGIC ---
@@ -34,22 +33,17 @@ io.on('connection', (socket) => {
     console.log(`Player connected: ${socket.id}`);
 
     socket.on('joinRoom', (roomId) => {
-        // If the room doesn't exist yet, create it and set default capacity to 2
         if (!rooms[roomId]) {
             rooms[roomId] = { players: [], maxPlayers: 2 };
         }
 
-        // DYNAMIC CHECK: Is the room full based on the Host's current setting?
         if (rooms[roomId].players.length >= rooms[roomId].maxPlayers) {
             console.log(`Player ${socket.id} joined ${roomId} as a SPECTATOR.`);
-            
-            // Let them join the socket room so they can watch the live moves!
             socket.join(roomId); 
             socket.emit('roomFull', rooms[roomId].maxPlayers); 
             return; 
         }
 
-        // If not full, let them join
         socket.join(roomId);
         const myPlayerId = rooms[roomId].players.length;
         rooms[roomId].players.push(socket.id);
@@ -59,9 +53,7 @@ io.on('connection', (socket) => {
         io.to(roomId).emit('playerCountUpdate', rooms[roomId].players.length);
     });
 
-    // --- SPECTATOR STATE SYNC ---
     socket.on('requestGameState', (roomId) => {
-        // The spectator asks the Host (Player 0) for a picture of the current board
         if (rooms[roomId] && rooms[roomId].players.length > 0) {
             const hostId = rooms[roomId].players[0]; 
             io.to(hostId).emit('hostPleaseSendState', socket.id);
@@ -69,12 +61,10 @@ io.on('connection', (socket) => {
     });
 
     socket.on('hostRepliedWithState', (data) => {
-        // Send the board state specifically to the spectator who asked for it
         io.to(data.spectatorId).emit('spectatorCatchUp', data.state);
     });
 
     socket.on('hostStartedGame', (data) => {
-        console.log(`Game started in room ${data.roomId} with ${data.numPlayers} players`);
         socket.to(data.roomId).emit('gameStartedByHost', data);
     });
 
@@ -97,31 +87,25 @@ io.on('connection', (socket) => {
         socket.to(data.roomId).emit('receiveMove', data);
     });
 
-    // --- OPTIMIZED DISCONNECT LOGIC ---
     socket.on('disconnect', () => {
         console.log(`Player disconnected: ${socket.id}`);
-        
-        // Search through all rooms to find where this player was
         for (const roomId in rooms) {
             const room = rooms[roomId];
             const playerIndex = room.players.indexOf(socket.id);
             
             if (playerIndex !== -1) {
-                // Remove the player from the room
                 room.players.splice(playerIndex, 1);
                 io.to(roomId).emit('playerCountUpdate', room.players.length);
                 
-                // OPTIMIZATION: If the room is completely empty, delete it to free up RAM!
                 if (room.players.length === 0) {
                     console.log(`Room ${roomId} is empty. Deleting to save memory.`);
                     delete rooms[roomId];
                 }
-                break; // Stop searching once we found them
+                break; 
             }
         }
     });
 });
-
 
 // --- TELEGRAM BOT LOGIC ---
 const rawToken = process.env.TELEGRAM_BOT_TOKEN;
@@ -131,29 +115,20 @@ const GAME_URL = 'https://atomic-blast.onrender.com';
 console.log("DEBUG - Token check:", token ? token.substring(0, 5) + "******" : "UNDEFINED!");
 
 if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
-    // Kept Polling TRUE: This prevents the bug where Render ignores Telegram's knocks!
     const bot = new TelegramBot(token, { polling: true });
 
     bot.deleteWebHook().catch(console.error);
 
-    // This handles the inline @username query
     bot.on('inline_query', (query) => {
         console.log(`[BOT] Received inline query from: ${query.from.first_name}`);
 
         const results = [
             {
-                // Official Game API Trigger
                 type: 'game',
                 id: query.id, 
-                game_short_name: 'atomicblast', // MUST match the short name from BotFather!
-                reply_markup: {
-                    inline_keyboard: [[
-                        {
-                            text: "🎮 Play Atomic Blast",
-                            callback_game: {} // This creates the native Telegram game button
-                        }
-                    ]]
-                }
+                game_short_name: 'atomicblast'
+                // FIX: We completely deleted the 'reply_markup' block here!
+                // Telegram will now perfectly auto-generate the native Play button itself.
             }
         ];
         
@@ -162,12 +137,9 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
         });
     });
 
-    // --- THE INSTANT LAUNCHER ---
-    // This listens for the exact moment someone taps the native PLAY button
     bot.on('callback_query', (query) => {
         if (query.game_short_name === 'atomicblast') {
             
-            // Generate a permanent multiplayer room for this specific chat bubble
             let roomId = "ROOM";
             if (query.inline_message_id) {
                 roomId = query.inline_message_id.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10).toUpperCase();
@@ -177,18 +149,16 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
 
             const gameLink = `${GAME_URL}/?room=${roomId}`;
 
-            // This command triggers the Official Telegram native game UI (with the privacy popup)
             bot.answerCallbackQuery(query.id, { url: gameLink }).catch(console.error);
         }
     });
     
-    console.log("Telegram Bot logic initialized with Official Game API!");
+    console.log("Telegram Bot logic initialized with Native Game API!");
 } else {
     console.log("WARNING: Telegram Bot is NOT running.");
 }
 
 // --- AUTO PING TO PREVENT SLEEP ---
-// This automatically hits your /ping route every 14 minutes
 setInterval(() => {
     https.get(GAME_URL + '/ping', (res) => {
         if (res.statusCode === 200) {
