@@ -237,7 +237,6 @@
 
         const socket = io();
         
-        // Grab the hidden Room code AND Player Name from the URL
         const urlParams = new URLSearchParams(window.location.search);
         let ROOM_ID = urlParams.get('room');
         let PLAYER_NAME = urlParams.get('name') || "Player"; 
@@ -250,7 +249,6 @@
         let myPlayerId = null; 
 
         socket.on('connect', () => {
-            // Send the name to the server when connecting
             socket.emit('joinRoom', { roomId: ROOM_ID, playerName: PLAYER_NAME });
         });
 
@@ -291,9 +289,25 @@
         });
 
         let connectedPlayersCount = 1; 
-        let lobbyPlayers = []; // Store the full list of names
+        let lobbyPlayers = []; 
         
-        // NEW: This listens for the Array of names, not just a raw number
+        // --- NEW: Dynamic Play Button Logic ---
+        function updatePlayButtonState() {
+            if (myPlayerId === 0) {
+                const startBtn = document.getElementById('startBtn');
+                if (connectedPlayersCount < numPlayers) {
+                    const missing = numPlayers - connectedPlayersCount;
+                    startBtn.innerText = `WAITING FOR ${missing} MORE...`;
+                    startBtn.disabled = true;
+                    startBtn.style.opacity = '0.5';
+                } else {
+                    startBtn.innerText = "PLAY";
+                    startBtn.disabled = false;
+                    startBtn.style.opacity = '1';
+                }
+            }
+        }
+
         socket.on('lobbyPlayersUpdate', (playersArray) => {
             lobbyPlayers = playersArray;
             connectedPlayersCount = playersArray.length;
@@ -301,7 +315,6 @@
             const statusText = document.getElementById('connectionStatus');
             if (statusText) statusText.innerText = `🟢 Connected: ${connectedPlayersCount}`;
 
-            // Draw the names in the list box!
             const listEl = document.getElementById('playerNamesList');
             if (listEl) {
                 listEl.innerHTML = '';
@@ -318,18 +331,8 @@
                 });
             }
 
-            if (myPlayerId === 0) {
-                const startBtn = document.getElementById('startBtn');
-                if (connectedPlayersCount < 2) {
-                    startBtn.innerText = "WAITING FOR PLAYERS...";
-                    startBtn.disabled = true;
-                    startBtn.style.opacity = '0.5';
-                } else {
-                    startBtn.innerText = "PLAY";
-                    startBtn.disabled = false;
-                    startBtn.style.opacity = '1';
-                }
-            }
+            // Immediately check if the button should be locked or unlocked
+            updatePlayButtonState();
         }); 
 
         socket.on('roomFull', (maxLimit) => {
@@ -367,7 +370,7 @@
                     cols: cols,
                     numPlayers: numPlayers,
                     grid: grid,
-                    players: players, // Contains the names!
+                    players: players, 
                     currentPlayerIndex: currentPlayerIndex,
                     gameActive: gameActive,
                     currentSeconds: currentSeconds,
@@ -531,6 +534,9 @@
             numPlayers = Math.max(2, Math.min(8, numPlayers + delta));
             playerCountDisplay.innerText = numPlayers;
             broadcastLobbyUpdate(); 
+            
+            // Instantly check if we locked/unlocked the button when changing the target number!
+            updatePlayButtonState();
         }
 
         function handleResize() {
@@ -547,7 +553,6 @@
 
             const margin = 20;
             const availableWidth = width - (margin * 2);
-            // Modified to add extra bottom margin so the grid doesn't block the new bottom banner
             const availableHeight = height - (margin * 2) - 80;
 
             const cellW = availableWidth / cols;
@@ -568,7 +573,8 @@
                 isFromHostBroadcast = false;
             }
 
-            if (myPlayerId === 0 && isFromHostBroadcast === false && connectedPlayersCount < 2) {
+            // NEW: Hardblock checks if connected players matches the dynamic numPlayers selected!
+            if (myPlayerId === 0 && isFromHostBroadcast === false && connectedPlayersCount < numPlayers) {
                 return; 
             }
 
@@ -591,7 +597,6 @@
 
             players = [];
             for (let i = 0; i < numPlayers; i++) {
-                // Ensure names successfully transfer into the physics logic
                 let pName = lobbyPlayers[i] ? lobbyPlayers[i].name : `Player ${i+1}`;
                 
                 players.push({
@@ -709,7 +714,6 @@
                 if (currentPlayerIndex === myPlayerId) {
                     indicator.innerText = `YOUR TURN (${displaySeconds}s)`;
                 } else {
-                    // NEW: Display the actual player's name
                     const displayName = p.name.length > 12 ? p.name.substring(0, 10) + '...' : p.name;
                     indicator.innerText = `${displayName.toUpperCase()}'S TURN (${displaySeconds}s)`;
                 }
@@ -903,7 +907,6 @@
 
         function showEliminationPopup(playerId) {
             const p = players[playerId];
-            // NEW: Displays Player Name for elimination
             eliminationText.innerText = `${p.name.toUpperCase()} ELIMINATED`;
             eliminationText.style.color = p.main;
             eliminationPopup.style.borderColor = p.main;
@@ -965,7 +968,6 @@
             clearInterval(turnTimer); 
             const p = players[playerId];
             
-            // NEW: Displays actual player name on win screen
             winnerText.innerText = `${p.name.toUpperCase()} WON!`;
             winnerIcon.style.backgroundColor = p.color;
             winnerIcon.style.color = 'black'; 
