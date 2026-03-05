@@ -30,32 +30,30 @@ const rooms = {};
 io.on('connection', (socket) => {
     console.log(`Player connected: ${socket.id}`);
 
-    // NEW: We now receive both the Room ID and the Player's Name
     socket.on('joinRoom', (data) => {
         const roomId = data.roomId;
         const playerName = data.playerName || 'Guest';
 
+        // NEW: We track if the game has started, instead of maxPlayers!
         if (!rooms[roomId]) {
-            rooms[roomId] = { players: [], maxPlayers: 2 };
-        }
-
-        if (rooms[roomId].players.length >= rooms[roomId].maxPlayers) {
-            console.log(`Player ${socket.id} joined ${roomId} as a SPECTATOR.`);
-            socket.join(roomId); 
-            socket.emit('roomFull', rooms[roomId].maxPlayers); 
-            return; 
+            rooms[roomId] = { players: [], gameStarted: false }; 
         }
 
         socket.join(roomId);
+
+        // NEW: If the game is actively running, force them to be a late spectator
+        if (rooms[roomId].gameStarted) {
+            console.log(`Player ${socket.id} joined ${roomId} as a LATE SPECTATOR.`);
+            socket.emit('roomFull'); // We use this to trigger the Spectate screen
+            return; 
+        }
+
+        // Otherwise, everyone joins the lobby queue!
         const myPlayerId = rooms[roomId].players.length;
-        
-        // NEW: Store the name alongside the connection ID
         rooms[roomId].players.push({ id: socket.id, name: playerName });
 
         console.log(`${playerName} joined ${roomId} as Player ${myPlayerId}`);
         socket.emit('assignPlayerId', myPlayerId);
-        
-        // NEW: Broadcast the full array of names to the room
         io.to(roomId).emit('lobbyPlayersUpdate', rooms[roomId].players);
     });
 
@@ -71,13 +69,21 @@ io.on('connection', (socket) => {
     });
 
     socket.on('hostStartedGame', (data) => {
+        // Mark the room as actively playing so latecomers are sent to spectate
+        if (rooms[data.roomId]) {
+            rooms[data.roomId].gameStarted = true;
+        }
         socket.to(data.roomId).emit('gameStartedByHost', data);
     });
 
-    socket.on('lobbyUpdate', (data) => {
-        if (rooms[data.roomId]) {
-            rooms[data.roomId].maxPlayers = data.numPlayers;
+    // NEW: When the host returns to the lobby, unlock the door for new players
+    socket.on('returnToLobby', (roomId) => {
+        if (rooms[roomId]) {
+            rooms[roomId].gameStarted = false;
         }
+    });
+
+    socket.on('lobbyUpdate', (data) => {
         socket.to(data.roomId).emit('lobbyUpdated', data);
     });
 
@@ -97,14 +103,10 @@ io.on('connection', (socket) => {
         console.log(`Player disconnected: ${socket.id}`);
         for (const roomId in rooms) {
             const room = rooms[roomId];
-            
-            // Search for the disconnected player's ID
             const playerIndex = room.players.findIndex(p => p.id === socket.id);
             
             if (playerIndex !== -1) {
                 room.players.splice(playerIndex, 1);
-                
-                // Broadcast the updated name list to everyone left in the lobby
                 io.to(roomId).emit('lobbyPlayersUpdate', room.players);
                 
                 if (room.players.length === 0) {
@@ -143,9 +145,7 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
             }
         ];
         
-        bot.answerInlineQuery(query.id, results, { cache_time: 0 }).catch(err => {
-            console.error("\n[BOT ERROR]", err);
-        });
+        bot.answerInlineQuery(query.id, results, { cache_time: 0 }).catch(console.error);
     });
 
     bot.on('callback_query', (query) => {
@@ -157,7 +157,6 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
                 roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
             }
 
-            // NEW: Grab their first name from Telegram and attach it to the URL!
             const userName = encodeURIComponent(query.from.first_name || 'Player');
             const gameLink = `${GAME_URL}/?room=${roomId}&name=${userName}`;
 
@@ -165,9 +164,7 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
         }
     });
     
-    console.log("Telegram Bot logic initialized with Native Game API!");
-} else {
-    console.log("WARNING: Telegram Bot is NOT running.");
+    console.log("Telegram Bot logic initialized!");
 }
 
 setInterval(() => {
