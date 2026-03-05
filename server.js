@@ -124,40 +124,49 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
     bot.on('inline_query', (query) => {
         console.log(`[BOT] Received inline query from: ${query.from.first_name}`);
 
-        const randomRoom = Math.random().toString(36).substring(2, 8).toUpperCase();
-        const roomLink = `${GAME_URL}/?room=${randomRoom}`;
-
         const results = [
             {
-                type: 'article',
+                // 1. Tell Telegram this is an Official Game, not a web article!
+                type: 'game',
                 id: query.id, 
-                title: 'Play Atomic Blast!',
-                description: 'Click to drop a game button in this chat.',
-                thumbnail_url: 'https://raw.githubusercontent.com/Pravprp/atomic-blast-bot/refs/heads/main/Image.png',
-                thumbnail_width: 120,
-                thumbnail_height: 120,
-                input_message_content: {
-                    // THE FIX: We changed the hidden link from the .png to ${roomLink}
-                    message_text: `[ ](${roomLink})💥 **Atomic Blast**\nI challenge you to a multiplayer match! Click the image or the button below to join the lobby.`,
-                    parse_mode: 'Markdown'
-                },
+                game_short_name: 'atomicblast', // This MUST match the short name from BotFather!
                 reply_markup: {
                     inline_keyboard: [[
                         {
-                            text: "🎮 Join Game",
-                            url: roomLink
+                            text: "🎮 Play Atomic Blast",
+                            callback_game: {} // This creates the native Telegram game button
                         }
                     ]]
                 }
             }
         ];
         
-        // FIX 3: Add cache_time: 0 so Telegram generates a fresh room link every single time
         bot.answerInlineQuery(query.id, results, { cache_time: 0 }).catch(err => {
             console.error("\n[BOT ERROR] Telegram rejected the query!");
             console.error("Reason:", err.response ? err.response.body : err.message);
             console.error("\n");
         });
+    });
+
+    // --- NEW: THE INSTANT LAUNCHER ---
+    // This listens for the exact moment someone taps the native PLAY button
+    bot.on('callback_query', (query) => {
+        if (query.game_short_name === 'atomicblast') {
+            
+            // 2. We use Telegram's unique chat bubble ID to create a permanent multiplayer room for this specific chat!
+            let roomId = "ROOM";
+            if (query.inline_message_id) {
+                // Strip out special characters so it's a safe room code
+                roomId = query.inline_message_id.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10).toUpperCase();
+            } else {
+                roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+            }
+
+            const gameLink = `${GAME_URL}/?room=${roomId}`;
+
+            // 3. This native command tells Telegram to instantly launch the game inside the app, with zero warnings!
+            bot.answerCallbackQuery(query.id, { url: gameLink }).catch(console.error);
+        }
     });
     
     console.log("Telegram Bot logic is initialized!");
@@ -182,4 +191,3 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
 });
-
