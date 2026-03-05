@@ -10,339 +10,128 @@
     <meta property="og:image" content="https://raw.githubusercontent.com/Pravprp/atomic-blast-bot/refs/heads/main/Image.png" />
     
     <style>
-        /* --- RESET & BASIC STYLES --- */
-        * {
-            box-sizing: border-box;
-            user-select: none;
-            -webkit-user-select: none;
-        }
-
+        * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
         body {
-            margin: 0;
-            overflow: hidden;
-            background-color: #000;
-            color: white;
-            touch-action: none;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
+            margin: 0; overflow: hidden; background-color: #000; color: white;
+            touch-action: none; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh; display: flex; flex-direction: column;
         }
+        canvas { display: block; }
+        button { cursor: pointer; border: none; outline: none; font-family: inherit; }
 
-        canvas {
-            display: block;
-        }
+        .hidden { display: none !important; }
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .justify-center { justify-content: center; }
+        .gap-2 { gap: 0.5rem; }
+        .gap-4 { gap: 1rem; }
+        .flex-grow { flex-grow: 1; }
+        .absolute { position: absolute; }
+        .relative { position: relative; }
+        .inset-0 { top: 0; left: 0; right: 0; bottom: 0; }
+        .top-1\/2 { top: 50% !important; }
+        .left-1\/2 { left: 50% !important; }
+        .z-10 { z-index: 10; }
+        .z-20 { z-index: 20; }
+        .z-30 { z-index: 30; }
+        .z-40 { z-index: 40; }
+        .w-full { width: 100%; }
+        .h-screen { height: 100vh; }
+        .text-center { text-align: center; }
+        .text-white { color: white; }
+        .font-bold { font-weight: bold; }
+        .uppercase { text-transform: uppercase; }
 
-        button {
-            cursor: pointer;
-            border: none;
-            outline: none;
-            font-family: inherit;
-        }
-
-        /* --- UTILITY CLASSES REPLACEMENT --- */
-        .hidden {
-            display: none !important;
-        }
-
-        .flex {
-            display: flex;
-        }
-
-        .flex-col {
-            flex-direction: column;
-        }
-
-        .items-center {
-            align-items: center;
-        }
-
-        .justify-between {
-            justify-content: space-between;
-        }
-
-        .justify-center {
-            justify-content: center;
-        }
-
-        .gap-2 {
-            gap: 0.5rem;
-        }
-
-        .gap-4 {
-            gap: 1rem;
-        }
-
-        .flex-grow {
-            flex-grow: 1;
-        }
-
-        .absolute {
-            position: absolute;
-        }
-
-        .relative {
-            position: relative;
-        }
-
-        .inset-0 {
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-        }
-
-        .top-1\/2 {
-            top: 50% !important;
-        }
-
-        .left-1\/2 {
-            left: 50% !important;
-        }
-
-        .z-10 {
-            z-index: 10;
-        }
-
-        .z-20 {
-            z-index: 20;
-        }
-
-        .z-30 {
-            z-index: 30;
-        }
-
-        .z-40 {
-            z-index: 40;
-        }
-
-        .w-full {
-            width: 100%;
-        }
-
-        .h-screen {
-            height: 100vh;
-        }
-
-        .text-center {
-            text-align: center;
-        }
-
-        .text-white {
-            color: white;
-        }
-
-        .font-bold {
-            font-weight: bold;
-        }
-
-        .uppercase {
-            text-transform: uppercase;
-        }
-
-        /* --- SPECIFIC COMPONENT STYLING --- */
-
-        /* Top Bar */
         .top-bar {
-            height: 3.5rem;
-            padding: 0 1rem;
-            background-color: #111827;
-            border-bottom: 1px solid #1f2937;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            height: 3.5rem; padding: 0 1rem; background-color: #111827;
+            border-bottom: 1px solid #1f2937; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
             flex-shrink: 0;
         }
 
         .game-title {
-            font-size: 1.25rem;
-            font-weight: 700;
+            font-size: 1.25rem; font-weight: 700;
             background: linear-gradient(to right, #60a5fa, #a855f7);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
             background-clip: text;
         }
 
-        /* Controls */
         .control-btn {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            padding: 0.25rem 0.75rem;
-            border-radius: 0.25rem;
-            font-size: 0.875rem;
-            color: white;
-            transition: all 0.2s;
+            background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 0.25rem 0.75rem; border-radius: 0.25rem; font-size: 0.875rem;
+            color: white; transition: all 0.2s;
         }
 
-        .control-btn:hover:not(:disabled) {
-            background: rgba(255, 255, 255, 0.2);
-        }
+        .control-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.2); }
+        .control-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .opacity-70 { opacity: 0.7; }
+        .opacity-100 { opacity: 1; }
+        .bg-blue-600 { background-color: #2563eb !important; border-color: #3b82f6 !important; }
 
-        .control-btn:disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
-        }
+        #game-container { background-color: #000; }
 
-        .opacity-70 {
-            opacity: 0.7;
-        }
-
-        .opacity-100 {
-            opacity: 1;
-        }
-
-        .bg-blue-600 {
-            background-color: #2563eb !important;
-            border-color: #3b82f6 !important;
-        }
-
-        /* Game Container */
-        #game-container {
-            background-color: #000;
-        }
-
-        /* Glass Panel (Menu) */
         .glass-panel {
-            background: rgba(30, 30, 30, 0.95);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 1.5rem;
-            border-radius: 1rem;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-            max-width: 24rem;
-            width: 100%;
-            margin: 1rem;
+            background: rgba(30, 30, 30, 0.95); backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 1.5rem; border-radius: 1rem; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            max-width: 24rem; width: 100%; margin: 1rem;
         }
 
-        /* Player Count Controls */
         .circle-btn {
-            width: 2.5rem;
-            height: 2.5rem;
-            border-radius: 50%;
-            background-color: #374151;
-            color: white;
-            font-weight: bold;
-            font-size: 1.25rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background-color 0.2s;
+            width: 2.5rem; height: 2.5rem; border-radius: 50%; background-color: #374151;
+            color: white; font-weight: bold; font-size: 1.25rem; display: flex;
+            align-items: center; justify-content: center; transition: background-color 0.2s;
         }
+        .circle-btn:hover { background-color: #4b5563; }
+        #playerCountDisplay { font-family: monospace; font-size: 1.875rem; width: 3rem; color: #60a5fa; }
 
-        .circle-btn:hover {
-            background-color: #4b5563;
-        }
-
-        #playerCountDisplay {
-            font-family: monospace;
-            font-size: 1.875rem;
-            width: 3rem;
-            color: #60a5fa;
-        }
-
-        /* Grid Selection */
         .grid-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 0.5rem;
-            margin-bottom: 0.75rem;
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-bottom: 0.75rem;
         }
-
         .grid-btn {
-            border: 1px solid #444;
-            background: #2a2a2a;
-            color: #888;
-            padding: 0.5rem;
-            border-radius: 0.5rem;
-            font-size: 0.875rem;
-            transition: all 0.2s;
+            border: 1px solid #444; background: #2a2a2a; color: #888; padding: 0.5rem;
+            border-radius: 0.5rem; font-size: 0.875rem; transition: all 0.2s;
         }
-
         .grid-btn.active {
-            background: #3b82f6;
-            color: white;
-            border-color: #3b82f6;
-            font-weight: bold;
+            background: #3b82f6; color: white; border-color: #3b82f6; font-weight: bold;
         }
 
-        /* Start Button */
         #startBtn {
-            padding: 1rem;
-            background: linear-gradient(to right, #2563eb, #9333ea);
-            border-radius: 0.75rem;
-            font-size: 1.125rem;
-            font-weight: bold;
-            color: white;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            transition: transform 0.1s;
+            padding: 1rem; background: linear-gradient(to right, #2563eb, #9333ea);
+            border-radius: 0.75rem; font-size: 1.125rem; font-weight: bold; color: white;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); transition: transform 0.1s; margin-top: 10px;
         }
+        #startBtn:hover { transform: scale(1.02); }
+        #startBtn:active { transform: scale(0.95); }
 
-        #startBtn:hover {
-            transform: scale(1.02);
-        }
-
-        #startBtn:active {
-            transform: scale(0.95);
-        }
-
-        /* Overlays & Labels */
         .label-text {
-            display: block;
-            color: #9ca3af;
-            font-size: 0.75rem;
-            font-weight: 700;
-            letter-spacing: 0.05em;
-            text-transform: uppercase;
-            margin-bottom: 0.5rem;
+            display: block; color: #9ca3af; font-size: 0.75rem; font-weight: 700;
+            letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.5rem;
         }
 
-        /* Winner Screen */
-        #winnerOverlay {
-            background: rgba(0, 0, 0, 0.9);
-        }
-
+        #winnerOverlay { background: rgba(0, 0, 0, 0.9); }
         #winnerIcon {
-            width: 6rem;
-            height: 6rem;
-            border-radius: 50%;
-            margin: 0 auto 1rem auto;
-            border: 4px solid white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #1f2937;
-            font-size: 2.25rem;
+            width: 6rem; height: 6rem; border-radius: 50%; margin: 0 auto 1rem auto;
+            border: 4px solid white; display: flex; align-items: center; justify-content: center;
+            background: #1f2937; font-size: 2.25rem;
         }
+        #winnerText { font-size: 2.25rem; font-weight: 900; margin-bottom: 0.5rem; }
 
-        #winnerText {
-            font-size: 2.25rem;
-            font-weight: 900;
-            margin-bottom: 0.5rem;
-        }
-
-        /* Elimination Popup */
         #eliminationPopup {
-            background: rgba(17, 24, 39, 0.95);
-            border: 2px solid white;
-            padding: 1.5rem 2rem;
-            border-radius: 1rem;
-            min-width: 250px;
-            pointer-events: none;
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
+            background: rgba(17, 24, 39, 0.95); border: 2px solid white; padding: 1.5rem 2rem;
+            border-radius: 1rem; min-width: 250px; pointer-events: none;
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
             transform: translate(-50%, -50%);
         }
 
-        /* Animations */
         @keyframes fadeOutScale {
             0% { opacity: 0; transform: translate(-50%, -40%) scale(0.8); }
             10% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
             80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
             100% { opacity: 0; transform: translate(-50%, -60%) scale(0.9); }
         }
-
-        .animate-elimination {
-            animation: fadeOutScale 1.0s ease-out forwards;
-        }
+        .animate-elimination { animation: fadeOutScale 1.0s ease-out forwards; }
     </style>
 </head>
 
@@ -365,7 +154,7 @@
         <canvas id="gameCanvas"></canvas>
 
         <div id="turnIndicator" class="absolute z-10 hidden flex items-center justify-center" 
-             style="top: 1.5rem; padding: 0.5rem 1.5rem; border-radius: 2rem; font-weight: 900; letter-spacing: 2px; border: 2px solid white; pointer-events: none; transition: opacity 0.2s;">
+             style="bottom: 2rem; padding: 0.75rem 2rem; border-radius: 2rem; font-weight: 900; letter-spacing: 2px; border: 2px solid white; pointer-events: none; transition: opacity 0.2s; font-size: 1.1rem; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
             YOUR TURN
         </div>
 
@@ -375,9 +164,15 @@
                 <h2 class="text-3xl font-bold mb-6 text-white"
                     style="letter-spacing: 0.05em; font-size: 1.875rem; margin-bottom: 1.5rem;">NEW GAME</h2>
 
-        <p id="connectionStatus" style="color: #4ade80; font-weight: bold; margin-bottom: 1rem;">
-                 🟢 Connected: 1
-            </p>
+                <p id="connectionStatus" style="color: #4ade80; font-weight: bold; margin-bottom: 0.5rem;">
+                     🟢 Connected: 1
+                </p>
+
+                <div style="background: rgba(0,0,0,0.4); border-radius: 0.5rem; padding: 0.75rem; margin-bottom: 1.5rem; text-align: left; max-height: 120px; overflow-y: auto;">
+                    <p style="color: #9ca3af; font-size: 0.75rem; font-weight: bold; margin-top: 0; margin-bottom: 0.5rem; text-transform: uppercase;">Players in Lobby</p>
+                    <ul id="playerNamesList" style="list-style: none; padding: 0; margin: 0; font-size: 0.875rem;">
+                        </ul>
+                </div>
 
                 <div style="margin-bottom: 1.5rem;">
                     <label class="label-text">Number of Players</label>
@@ -388,7 +183,7 @@
                     </div>
                 </div>
 
-                <div style="margin-bottom: 2rem;">
+                <div style="margin-bottom: 1rem;">
                     <label class="label-text">Grid Size</label>
                     <div class="grid-grid">
                         <button class="grid-btn" onclick="selectGrid(4,4, this)">4x4</button>
@@ -422,11 +217,9 @@
                 ELIMINATED</h2>
         </div>
     </div>
+    
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
-        /**
-         * Game Configuration & Constants
-         */
         const COLORS = [
             { name: 'RED', main: '#E6194B', glow: 'rgba(230, 25, 75, 0.8)' },
             { name: 'GREEN', main: '#3CB44B', glow: 'rgba(60, 180, 75, 0.8)' },
@@ -442,27 +235,23 @@
         const CELL_PADDING = 2;
         const ANIMATION_SPEED = 0.15; 
 
-        /**
-         * Game State
-         */
         const socket = io();
         
+        // Grab the hidden Room code AND Player Name from the URL
         const urlParams = new URLSearchParams(window.location.search);
         let ROOM_ID = urlParams.get('room');
+        let PLAYER_NAME = urlParams.get('name') || "Player"; 
 
         if (!ROOM_ID) {
             ROOM_ID = Math.random().toString(36).substring(2, 8).toUpperCase();
-            try {
-                window.history.replaceState({}, '', `?room=${ROOM_ID}`);
-            } catch (error) {
-                console.log("Local testing blocked URL update.");
-            }
+            try { window.history.replaceState({}, '', `?room=${ROOM_ID}`); } catch (error) {}
         }
 
         let myPlayerId = null; 
 
         socket.on('connect', () => {
-            socket.emit('joinRoom', ROOM_ID);
+            // Send the name to the server when connecting
+            socket.emit('joinRoom', { roomId: ROOM_ID, playerName: PLAYER_NAME });
         });
 
         socket.on('assignPlayerId', (id) => {
@@ -502,17 +291,36 @@
         });
 
         let connectedPlayersCount = 1; 
+        let lobbyPlayers = []; // Store the full list of names
         
-        socket.on('playerCountUpdate', (count) => {
-            connectedPlayersCount = count;
+        // NEW: This listens for the Array of names, not just a raw number
+        socket.on('lobbyPlayersUpdate', (playersArray) => {
+            lobbyPlayers = playersArray;
+            connectedPlayersCount = playersArray.length;
+            
             const statusText = document.getElementById('connectionStatus');
-            if (statusText) {
-                statusText.innerText = `🟢 Connected: ${count}`;
+            if (statusText) statusText.innerText = `🟢 Connected: ${connectedPlayersCount}`;
+
+            // Draw the names in the list box!
+            const listEl = document.getElementById('playerNamesList');
+            if (listEl) {
+                listEl.innerHTML = '';
+                playersArray.forEach((p, index) => {
+                    const li = document.createElement('li');
+                    li.style.marginBottom = '0.4rem';
+                    
+                    if (index === 0) {
+                        li.innerHTML = `⭐ <strong style="color:#facc15">${p.name}</strong> joined (Host)`;
+                    } else {
+                        li.innerHTML = `🎮 <strong style="color:#60a5fa">${p.name}</strong> joined`;
+                    }
+                    listEl.appendChild(li);
+                });
             }
 
             if (myPlayerId === 0) {
                 const startBtn = document.getElementById('startBtn');
-                if (count < 2) {
+                if (connectedPlayersCount < 2) {
                     startBtn.innerText = "WAITING FOR PLAYERS...";
                     startBtn.disabled = true;
                     startBtn.style.opacity = '0.5';
@@ -559,7 +367,7 @@
                     cols: cols,
                     numPlayers: numPlayers,
                     grid: grid,
-                    players: players,
+                    players: players, // Contains the names!
                     currentPlayerIndex: currentPlayerIndex,
                     gameActive: gameActive,
                     currentSeconds: currentSeconds,
@@ -603,7 +411,6 @@
                 numPlayers = data.numPlayers;
                 document.getElementById('playerCountDisplay').innerText = numPlayers;
 
-                // Sync Grid Variables correctly for Spectators
                 nextRows = data.rows;
                 nextCols = data.cols;
 
@@ -613,7 +420,7 @@
                 if (nextRows === 4) btns[0].classList.add('active');
                 if (nextRows === 5) btns[1].classList.add('active');
                 if (nextRows === 6) btns[2].classList.add('active');
-                if (nextRows === 8) btns[3].classList.add('active'); // The new 8x6 selection!
+                if (nextRows === 8) btns[3].classList.add('active');
             }
         });
 
@@ -639,11 +446,9 @@
         let currentPlayerIndex = 0;
         let isAnimating = false;
         let projectiles = []; 
-        let particles = []; 
         let gameActive = false;
         let totalMoves = 0;
         let checkWinCondition = false; 
-        let animationFrameId;
 
         let turnTimer = null;
         let currentSeconds = 15;
@@ -742,7 +547,8 @@
 
             const margin = 20;
             const availableWidth = width - (margin * 2);
-            const availableHeight = height - (margin * 2);
+            // Modified to add extra bottom margin so the grid doesn't block the new bottom banner
+            const availableHeight = height - (margin * 2) - 80;
 
             const cellW = availableWidth / cols;
             const cellH = availableHeight / rows;
@@ -785,8 +591,12 @@
 
             players = [];
             for (let i = 0; i < numPlayers; i++) {
+                // Ensure names successfully transfer into the physics logic
+                let pName = lobbyPlayers[i] ? lobbyPlayers[i].name : `Player ${i+1}`;
+                
                 players.push({
                     id: i,
+                    name: pName, 
                     color: COLORS[i].main,
                     glow: COLORS[i].glow,
                     alive: true,
@@ -899,7 +709,9 @@
                 if (currentPlayerIndex === myPlayerId) {
                     indicator.innerText = `YOUR TURN (${displaySeconds}s)`;
                 } else {
-                    indicator.innerText = `${COLORS[p.id].name} (${displaySeconds}s)`;
+                    // NEW: Display the actual player's name
+                    const displayName = p.name.length > 12 ? p.name.substring(0, 10) + '...' : p.name;
+                    indicator.innerText = `${displayName.toUpperCase()}'S TURN (${displaySeconds}s)`;
                 }
                 
                 indicator.classList.remove('hidden');
@@ -1091,7 +903,8 @@
 
         function showEliminationPopup(playerId) {
             const p = players[playerId];
-            eliminationText.innerText = `${COLORS[playerId].name} ELIMINATED`;
+            // NEW: Displays Player Name for elimination
+            eliminationText.innerText = `${p.name.toUpperCase()} ELIMINATED`;
             eliminationText.style.color = p.main;
             eliminationPopup.style.borderColor = p.main;
             eliminationPopup.style.boxShadow = `0 0 30px ${p.glow}`;
@@ -1151,7 +964,9 @@
             gameActive = false;
             clearInterval(turnTimer); 
             const p = players[playerId];
-            winnerText.innerText = `${COLORS[playerId].name} WON!`;
+            
+            // NEW: Displays actual player name on win screen
+            winnerText.innerText = `${p.name.toUpperCase()} WON!`;
             winnerIcon.style.backgroundColor = p.color;
             winnerIcon.style.color = 'black'; 
             winnerIcon.style.borderColor = p.color;
