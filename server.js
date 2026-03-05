@@ -9,6 +9,9 @@ const https = require('https'); // Required for the auto-ping system
 const app = express();
 app.use(cors());
 
+// NEW: This is required for Webhooks so Express can read Telegram's messages
+app.use(express.json());
+
 // Serve the HTML file directly from the server
 app.use(express.static(__dirname));
 app.get('/', (req, res) => {
@@ -43,7 +46,7 @@ io.on('connection', (socket) => {
         if (rooms[roomId].players.length >= rooms[roomId].maxPlayers) {
             console.log(`Player ${socket.id} joined ${roomId} as a SPECTATOR.`);
             
-            // NEW: Let them join the socket room so they can watch the live moves!
+            // Let them join the socket room so they can watch the live moves!
             socket.join(roomId); 
             socket.emit('roomFull', rooms[roomId].maxPlayers); 
             return; 
@@ -59,7 +62,7 @@ io.on('connection', (socket) => {
         io.to(roomId).emit('playerCountUpdate', rooms[roomId].players.length);
     });
 
-    // --- NEW: SPECTATOR STATE SYNC ---
+    // --- SPECTATOR STATE SYNC ---
     socket.on('requestGameState', (roomId) => {
         // The spectator asks the Host (Player 0) for a picture of the current board
         if (rooms[roomId] && rooms[roomId].players.length > 0) {
@@ -135,10 +138,19 @@ console.log("DEBUG - Token check:", token ? token.substring(0, 5) + "******" : "
 
 // Added a stricter check here
 if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
-    const bot = new TelegramBot(token, { polling: true });
+    
+    // NEW: We turn polling completely OFF to save CPU!
+    const bot = new TelegramBot(token, { polling: false });
 
-    // FIX 1: Clear any stuck webhooks that might prevent polling from working
-    bot.deleteWebHook().catch(console.error);
+    // NEW: We tell Telegram to send messages to this specific secret URL
+    const webhookUrl = `${GAME_URL}/bot${token}`;
+    bot.setWebHook(webhookUrl).catch(console.error);
+
+    // NEW: Our server waits quietly for Telegram to knock on the door
+    app.post(`/bot${token}`, (req, res) => {
+        bot.processUpdate(req.body); // Read the message
+        res.sendStatus(200); // Tell Telegram "Got it!"
+    });
 
     // This handles the inline @username query
     bot.on('inline_query', (query) => {
@@ -146,7 +158,7 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
 
         const results = [
             {
-                // 1. Tell Telegram this is an Official Game, not a web article!
+                // Tell Telegram this is an Official Game, not a web article!
                 type: 'game',
                 id: query.id, 
                 game_short_name: 'atomicblast', // This MUST match the short name from BotFather!
@@ -168,12 +180,12 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
         });
     });
 
-    // --- NEW: THE INSTANT LAUNCHER ---
+    // --- THE INSTANT LAUNCHER ---
     // This listens for the exact moment someone taps the native PLAY button
     bot.on('callback_query', (query) => {
         if (query.game_short_name === 'atomicblast') {
             
-            // 2. We use Telegram's unique chat bubble ID to create a permanent multiplayer room for this specific chat!
+            // We use Telegram's unique chat bubble ID to create a permanent multiplayer room for this specific chat!
             let roomId = "ROOM";
             if (query.inline_message_id) {
                 // Strip out special characters so it's a safe room code
@@ -184,12 +196,12 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
 
             const gameLink = `${GAME_URL}/?room=${roomId}`;
 
-            // 3. This native command tells Telegram to instantly launch the game inside the app, with zero warnings!
+            // This native command tells Telegram to instantly launch the game inside the app, with zero warnings!
             bot.answerCallbackQuery(query.id, { url: gameLink }).catch(console.error);
         }
     });
     
-    console.log("Telegram Bot logic is initialized!");
+    console.log("Telegram Bot logic is initialized with WEBHOOKS! CPU usage minimized.");
 } else {
     console.log("WARNING: Telegram Bot is NOT running. Please replace 'YOUR_BOT_TOKEN_HERE' with your real token.");
 }
