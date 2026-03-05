@@ -9,13 +9,11 @@ const https = require('https');
 const app = express();
 app.use(cors());
 
-// Serve the HTML file directly from the server
 app.use(express.static(__dirname));
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// A lightweight backdoor just for keeping the server awake
 app.get('/ping', (req, res) => {
     res.status(200).send('I am awake!');
 });
@@ -32,7 +30,11 @@ const rooms = {};
 io.on('connection', (socket) => {
     console.log(`Player connected: ${socket.id}`);
 
-    socket.on('joinRoom', (roomId) => {
+    // NEW: We now receive both the Room ID and the Player's Name
+    socket.on('joinRoom', (data) => {
+        const roomId = data.roomId;
+        const playerName = data.playerName || 'Guest';
+
         if (!rooms[roomId]) {
             rooms[roomId] = { players: [], maxPlayers: 2 };
         }
@@ -46,16 +48,20 @@ io.on('connection', (socket) => {
 
         socket.join(roomId);
         const myPlayerId = rooms[roomId].players.length;
-        rooms[roomId].players.push(socket.id);
+        
+        // NEW: Store the name alongside the connection ID
+        rooms[roomId].players.push({ id: socket.id, name: playerName });
 
-        console.log(`Player ${socket.id} joined ${roomId} as Player ${myPlayerId}`);
+        console.log(`${playerName} joined ${roomId} as Player ${myPlayerId}`);
         socket.emit('assignPlayerId', myPlayerId);
-        io.to(roomId).emit('playerCountUpdate', rooms[roomId].players.length);
+        
+        // NEW: Broadcast the full array of names to the room
+        io.to(roomId).emit('lobbyPlayersUpdate', rooms[roomId].players);
     });
 
     socket.on('requestGameState', (roomId) => {
         if (rooms[roomId] && rooms[roomId].players.length > 0) {
-            const hostId = rooms[roomId].players[0]; 
+            const hostId = rooms[roomId].players[0].id; 
             io.to(hostId).emit('hostPleaseSendState', socket.id);
         }
     });
@@ -91,11 +97,15 @@ io.on('connection', (socket) => {
         console.log(`Player disconnected: ${socket.id}`);
         for (const roomId in rooms) {
             const room = rooms[roomId];
-            const playerIndex = room.players.indexOf(socket.id);
+            
+            // Search for the disconnected player's ID
+            const playerIndex = room.players.findIndex(p => p.id === socket.id);
             
             if (playerIndex !== -1) {
                 room.players.splice(playerIndex, 1);
-                io.to(roomId).emit('playerCountUpdate', room.players.length);
+                
+                // Broadcast the updated name list to everyone left in the lobby
+                io.to(roomId).emit('lobbyPlayersUpdate', room.players);
                 
                 if (room.players.length === 0) {
                     console.log(`Room ${roomId} is empty. Deleting to save memory.`);
@@ -122,8 +132,6 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
                 type: 'game',
                 id: query.id, 
                 game_short_name: 'atomicblast',
-                // THE FIX: We explicitly define ONLY the Play button. 
-                // This stops Telegram from auto-generating a second "Share" button!
                 reply_markup: {
                     inline_keyboard: [[
                         {
@@ -149,7 +157,10 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
                 roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
             }
 
-            const gameLink = `${GAME_URL}/?room=${roomId}`;
+            // NEW: Grab their first name from Telegram and attach it to the URL!
+            const userName = encodeURIComponent(query.from.first_name || 'Player');
+            const gameLink = `${GAME_URL}/?room=${roomId}&name=${userName}`;
+
             bot.answerCallbackQuery(query.id, { url: gameLink }).catch(console.error);
         }
     });
@@ -159,7 +170,6 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
     console.log("WARNING: Telegram Bot is NOT running.");
 }
 
-// --- AUTO PING TO PREVENT SLEEP ---
 setInterval(() => {
     https.get(GAME_URL + '/ping', (res) => {
         if (res.statusCode === 200) {}
