@@ -145,22 +145,17 @@
         /* Top Bar */
         .top-bar {
             height: 3.5rem;
-            /* h-14 */
             padding: 0 1rem;
             background-color: #111827;
-            /* bg-gray-900 */
             border-bottom: 1px solid #1f2937;
-            /* border-gray-800 */
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
             flex-shrink: 0;
         }
 
         .game-title {
             font-size: 1.25rem;
-            /* text-xl */
             font-weight: 700;
             background: linear-gradient(to right, #60a5fa, #a855f7);
-            /* blue-400 to purple-500 */
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -186,16 +181,11 @@
             cursor: not-allowed;
         }
 
-        /* JS Toggled Classes for Buttons (Keep these exact names) */
         .opacity-70 {
             opacity: 0.7;
         }
 
         .opacity-100 {
-            opacity: 1;
-        }
-
-        .hover\:opacity-100:hover {
             opacity: 1;
         }
 
@@ -216,12 +206,9 @@
             -webkit-backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.1);
             padding: 1.5rem;
-            /* p-6 */
             border-radius: 1rem;
-            /* rounded-2xl */
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
             max-width: 24rem;
-            /* max-w-sm */
             width: 100%;
             margin: 1rem;
         }
@@ -232,7 +219,6 @@
             height: 2.5rem;
             border-radius: 50%;
             background-color: #374151;
-            /* gray-700 */
             color: white;
             font-weight: bold;
             font-size: 1.25rem;
@@ -244,7 +230,6 @@
 
         .circle-btn:hover {
             background-color: #4b5563;
-            /* gray-600 */
         }
 
         #playerCountDisplay {
@@ -252,7 +237,6 @@
             font-size: 1.875rem;
             width: 3rem;
             color: #60a5fa;
-            /* blue-400 */
         }
 
         /* Grid Selection */
@@ -275,26 +259,9 @@
 
         .grid-btn.active {
             background: #3b82f6;
-            /* blue-500 */
             color: white;
             border-color: #3b82f6;
             font-weight: bold;
-        }
-
-        /* Inputs */
-        .grid-input {
-            background: #1a1a1a;
-            border: 1px solid #444;
-            color: white;
-            text-align: center;
-            border-radius: 0.5rem;
-            width: 4rem;
-            height: 2.5rem;
-        }
-
-        .grid-input:focus {
-            outline: none;
-            border-color: #3b82f6;
         }
 
         /* Start Button */
@@ -321,7 +288,6 @@
         .label-text {
             display: block;
             color: #9ca3af;
-            /* gray-400 */
             font-size: 0.75rem;
             font-weight: 700;
             letter-spacing: 0.05em;
@@ -368,43 +334,14 @@
 
         /* Animations */
         @keyframes fadeOutScale {
-            0% {
-                opacity: 0;
-                transform: translate(-50%, -40%) scale(0.8);
-            }
-
-            10% {
-                opacity: 1;
-                transform: translate(-50%, -50%) scale(1.1);
-            }
-
-            80% {
-                opacity: 1;
-                transform: translate(-50%, -50%) scale(1);
-            }
-
-            100% {
-                opacity: 0;
-                transform: translate(-50%, -60%) scale(0.9);
-            }
+            0% { opacity: 0; transform: translate(-50%, -40%) scale(0.8); }
+            10% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+            80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -60%) scale(0.9); }
         }
 
         .animate-elimination {
             animation: fadeOutScale 1.0s ease-out forwards;
-        }
-
-        .animate-fade-in {
-            animation: fadeIn 0.3s ease-out forwards;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-            }
-
-            to {
-                opacity: 1;
-            }
         }
     </style>
 </head>
@@ -457,22 +394,7 @@
                         <button class="grid-btn" onclick="selectGrid(4,4, this)">4x4</button>
                         <button class="grid-btn" onclick="selectGrid(5,5, this)">5x5</button>
                         <button class="grid-btn active" onclick="selectGrid(6,6, this)">6x6</button>
-                        <button class="grid-btn" onclick="toggleCustomGrid(this)">Custom</button>
-                    </div>
-
-                    <div id="customGridInputs" class="hidden flex justify-center items-center gap-2 animate-fade-in"
-                        style="margin-top: 0.75rem;">
-                        <div class="flex flex-col">
-                            <input type="number" id="customRows" value="9" min="3" max="15" class="grid-input">
-                            <span class="text-center"
-                                style="font-size: 10px; color: #6b7280; margin-top: 4px;">Rows</span>
-                        </div>
-                        <span style="color: #9ca3af; font-weight: bold;">×</span>
-                        <div class="flex flex-col">
-                            <input type="number" id="customCols" value="6" min="3" max="15" class="grid-input">
-                            <span class="text-center"
-                                style="font-size: 10px; color: #6b7280; margin-top: 4px;">Cols</span>
-                        </div>
+                        <button class="grid-btn" onclick="selectGrid(8,6, this)">8x6</button>
                     </div>
                 </div>
 
@@ -516,49 +438,40 @@
             { name: 'BROWN', main: '#D2691E', glow: 'rgba(210, 105, 30, 0.8)' }
         ];
 
-        const ORB_RADIUS_RATIO = 0.25; // Size relative to cell
+        const ORB_RADIUS_RATIO = 0.25; 
         const CELL_PADDING = 2;
-        const ANIMATION_SPEED = 0.15; // Speed of flying particles (0-1)
+        const ANIMATION_SPEED = 0.15; 
 
         /**
          * Game State
          */
-        // --- MULTIPLAYER SETUP ---
         const socket = io();
         
-        // 1. Check for Dynamic Room ID in the URL
         const urlParams = new URLSearchParams(window.location.search);
         let ROOM_ID = urlParams.get('room');
 
-        // If no room code exists, generate one
         if (!ROOM_ID) {
             ROOM_ID = Math.random().toString(36).substring(2, 8).toUpperCase();
             try {
                 window.history.replaceState({}, '', `?room=${ROOM_ID}`);
             } catch (error) {
-                console.log("Local testing blocked URL update. Room ID is:", ROOM_ID);
+                console.log("Local testing blocked URL update.");
             }
         }
-        console.log("Joining Room:", ROOM_ID);
 
-        let myPlayerId = null; // Stores if I am Player 0 (Red), Player 1 (Green), etc.
+        let myPlayerId = null; 
 
         socket.on('connect', () => {
             socket.emit('joinRoom', ROOM_ID);
         });
 
-        // 2. The server tells us who we are when we join
         socket.on('assignPlayerId', (id) => {
             myPlayerId = id;
-            console.log("I am Player ID:", myPlayerId);
             
-            // If I am NOT the first person here (Player 0), lock the menu settings!
             if (myPlayerId !== 0) {
-                // 1. Lock the Play button
                 document.getElementById('startBtn').innerText = "WAITING FOR HOST...";
                 document.getElementById('startBtn').disabled = true;
 
-                // 2. Lock the Player Count (+ / -) buttons
                 document.getElementById('pDec').disabled = true;
                 document.getElementById('pInc').disabled = true;
                 document.getElementById('pDec').style.opacity = '0.5';
@@ -566,41 +479,29 @@
                 document.getElementById('pDec').style.cursor = 'not-allowed';
                 document.getElementById('pInc').style.cursor = 'not-allowed';
 
-                // 3. Lock all Grid Size buttons
                 const gridBtns = document.querySelectorAll('.grid-btn');
                 gridBtns.forEach(btn => {
                     btn.disabled = true;
                     btn.style.opacity = '0.5';
                     btn.style.cursor = 'not-allowed';
                 });
-
-                // 4. Lock Custom Inputs
-                document.getElementById('customRows').disabled = true;
-                document.getElementById('customCols').disabled = true;
             }
         });
 
-        // 3. The server tells us the Host clicked PLAY
         socket.on('gameStartedByHost', (data) => {
-            // Copy the host's grid size and player count
             nextRows = data.rows;
             nextCols = data.cols;
             numPlayers = data.numPlayers;
             
-            // Update the screen numbers to match the host
             document.getElementById('playerCountDisplay').innerText = numPlayers;
-            
-            // Force the game to start on our screen
             startGame(true); 
         });
 
-        // 4. The server tells us someone made a move
         socket.on('receiveMove', (data) => {
             processMove(data.r, data.c);
         });
 
-        // 5. Update the connection text when someone joins
-        let connectedPlayersCount = 1; // Track the exact number of players
+        let connectedPlayersCount = 1; 
         
         socket.on('playerCountUpdate', (count) => {
             connectedPlayersCount = count;
@@ -609,7 +510,6 @@
                 statusText.innerText = `🟢 Connected: ${count}`;
             }
 
-            // NEW: If I am the Host, lock the play button until someone else joins!
             if (myPlayerId === 0) {
                 const startBtn = document.getElementById('startBtn');
                 if (count < 2) {
@@ -624,18 +524,15 @@
             }
         }); 
 
-        // --- NEW: 6. SPECTATOR MODE LOGIC ---
-        // If the server says the room is full, activate SPECTATOR mode
         socket.on('roomFull', (maxLimit) => {
             const statusText = document.getElementById('connectionStatus');
             if (statusText) {
                 statusText.innerText = `👁️ Spectating (Max ${maxLimit} Players)`;
-                statusText.style.color = '#facc15'; // Yellow color
+                statusText.style.color = '#facc15'; 
             }
 
-            myPlayerId = 'spectator'; // Lock them out of making moves
+            myPlayerId = 'spectator'; 
 
-            // Disable all settings UI
             document.getElementById('pDec').disabled = true;
             document.getElementById('pInc').disabled = true;
             document.querySelectorAll('.grid-btn').forEach(btn => {
@@ -643,25 +540,20 @@
                 btn.style.opacity = '0.5';
                 btn.style.cursor = 'not-allowed';
             });
-            document.getElementById('customRows').disabled = true;
-            document.getElementById('customCols').disabled = true;
             
-            // Turn Play button into Spectate button
             const startBtn = document.getElementById('startBtn');
             startBtn.innerText = "SPECTATE MATCH";
-            startBtn.disabled = false; // Re-enable it!
+            startBtn.disabled = false; 
             startBtn.style.opacity = '1';
             
-            // Ask the Host for the current board state when clicked
             startBtn.onclick = () => {
                 startBtn.innerText = "LOADING BOARD...";
                 socket.emit('requestGameState', ROOM_ID);
             };
         }); 
 
-        // The Host receives this invisibly in the background
         socket.on('hostPleaseSendState', (spectatorSocketId) => {
-            if (myPlayerId === 0) { // Only the Host replies
+            if (myPlayerId === 0) { 
                 const currentState = {
                     rows: rows,
                     cols: cols,
@@ -671,16 +563,14 @@
                     currentPlayerIndex: currentPlayerIndex,
                     gameActive: gameActive,
                     currentSeconds: currentSeconds,
-                    moveHistory: moveHistory // Share history so undo works for spectators!
+                    moveHistory: moveHistory 
                 };
                 socket.emit('hostRepliedWithState', { spectatorId: spectatorSocketId, state: currentState });
             }
         });
 
-        // The Spectator receives the board state from the Host
         socket.on('spectatorCatchUp', (state) => {
             if (state.gameActive) {
-                // Game is running! Copy everything to the spectator's screen
                 rows = state.rows;
                 cols = state.cols;
                 numPlayers = state.numPlayers;
@@ -691,63 +581,46 @@
                 currentSeconds = state.currentSeconds;
                 moveHistory = state.moveHistory;
 
-                handleResize(); // Draw the correct grid size
-                menuOverlay.classList.add('hidden'); // Hide the menu
+                handleResize(); 
+                menuOverlay.classList.add('hidden'); 
                 gameControls.classList.remove('hidden');
                 updateTurnIndicator();
                 
-                // Run a dummy clock for the spectator just to see time tick down
                 clearInterval(turnTimer);
                 turnTimer = setInterval(() => {
                     currentSeconds--;
                     updateTurnIndicator();
                 }, 1000);
             } else {
-                // Game hasn't started yet. Let them wait in the lobby!
                 const startBtn = document.getElementById('startBtn');
                 startBtn.innerText = "WAITING FOR HOST...";
                 startBtn.disabled = true;
             }
         });
-        // ------------------------------------
 
-        // 7. Listen for live lobby setting changes from the Host
         socket.on('lobbyUpdated', (data) => {
             if (myPlayerId !== 0) {
-                // 1. Sync Number of Players
                 numPlayers = data.numPlayers;
                 document.getElementById('playerCountDisplay').innerText = numPlayers;
 
-                // 2. Sync Grid Variables
+                // Sync Grid Variables correctly for Spectators
                 nextRows = data.rows;
                 nextCols = data.cols;
-                isCustomGrid = data.isCustom;
 
-                // 3. Sync UI Grid Buttons Visually
                 const btns = document.querySelectorAll('.grid-btn');
                 btns.forEach(b => b.classList.remove('active'));
                 
-                if (isCustomGrid) {
-                    btns[3].classList.add('active'); // The "Custom" button
-                    document.getElementById('customGridInputs').classList.remove('hidden');
-                    document.getElementById('customRows').value = nextRows;
-                    document.getElementById('customCols').value = nextCols;
-                } else {
-                    document.getElementById('customGridInputs').classList.add('hidden');
-                    if (nextRows === 4) btns[0].classList.add('active');
-                    if (nextRows === 5) btns[1].classList.add('active');
-                    if (nextRows === 6) btns[2].classList.add('active');
-                }
+                if (nextRows === 4) btns[0].classList.add('active');
+                if (nextRows === 5) btns[1].classList.add('active');
+                if (nextRows === 6) btns[2].classList.add('active');
+                if (nextRows === 8) btns[3].classList.add('active'); // The new 8x6 selection!
             }
         });
 
-        // 8. If someone else clicked Undo, we need to undo on our screen too
         socket.on('receiveUndo', () => {
-            // Pass 'true' so we don't accidentally send it back to the server in an infinite loop
             undoMove(true); 
         });
 
-        // 9. Listen for timeouts from other players
         socket.on('receiveTimeoutSkip', () => {
             processTimeout();
         });
@@ -755,11 +628,9 @@
         // -------------------------
         let canvas, ctx;
         let width, height;
-        // Grid Dimensions: Controlled by Selection
         let rows = 6, cols = 6;
         let nextRows = 6, nextCols = 6;
-        let isCustomGrid = false;
-        let isThickGrid = true; // BOLD BY DEFAULT
+        let isThickGrid = true; 
 
         let cellSize;
         let grid = [];
@@ -767,25 +638,20 @@
         let numPlayers = 2;
         let currentPlayerIndex = 0;
         let isAnimating = false;
-        let projectiles = []; // Flying orbs during explosion
-        let particles = []; // Visual sparks/debris (purely cosmetic)
+        let projectiles = []; 
+        let particles = []; 
         let gameActive = false;
         let totalMoves = 0;
-        let checkWinCondition = false; // Don't check win until 1 full round
+        let checkWinCondition = false; 
         let animationFrameId;
 
-        // Timer Variables
         let turnTimer = null;
         let currentSeconds = 15;
 
-        // Undo History
         let moveHistory = [];
-
-        // Elimination System
         let eliminationQueue = [];
         let isShowingElimination = false;
 
-        // DOM Elements
         const menuOverlay = document.getElementById('menuOverlay');
         const winnerOverlay = document.getElementById('winnerOverlay');
         const winnerText = document.getElementById('winnerText');
@@ -793,32 +659,25 @@
         const playerCountDisplay = document.getElementById('playerCountDisplay');
         const undoBtn = document.getElementById('undoBtn');
         const thickGridBtn = document.getElementById('thickGridBtn');
-        const customGridInputs = document.getElementById('customGridInputs');
         const gameControls = document.getElementById('gameControls');
         const eliminationPopup = document.getElementById('eliminationPopup');
         const eliminationText = document.getElementById('eliminationText');
 
-        /**
-         * Initialization
-         */
         window.onload = () => {
             canvas = document.getElementById('gameCanvas');
             ctx = canvas.getContext('2d');
 
-            // Lock orientation to portrait if supported
             if (screen.orientation && screen.orientation.lock) {
                 screen.orientation.lock('portrait').catch(err => {
                     console.log("Orientation lock not supported:", err);
                 });
             }
 
-            // UI Event Listeners
             document.getElementById('pInc').onclick = () => updatePlayerCount(1);
             document.getElementById('pDec').onclick = () => updatePlayerCount(-1);
             document.getElementById('startBtn').onclick = startGame;
             undoBtn.onclick = undoMove;
 
-            // Thick Grid Toggle Logic
             thickGridBtn.onclick = () => {
                 isThickGrid = !isThickGrid;
                 if (isThickGrid) {
@@ -835,53 +694,25 @@
             window.addEventListener('resize', handleResize);
             canvas.addEventListener('mousedown', handleInput);
             canvas.addEventListener('touchstart', handleInput, { passive: false });
-            
-            // Ensure Custom Input handling
-            document.getElementById('customRows').addEventListener('change', (e) => {
-                nextRows = parseInt(e.target.value) || 9;
-                broadcastLobbyUpdate();
-            });
-            document.getElementById('customCols').addEventListener('change', (e) => {
-                nextCols = parseInt(e.target.value) || 6;
-                broadcastLobbyUpdate();
-            });
 
             handleResize();
             gameLoop();
         };
 
-        // Helper function to tell the server when the Host changes a setting
         function broadcastLobbyUpdate() {
             if (myPlayerId === 0 && socket) {
                 socket.emit('lobbyUpdate', {
                     roomId: ROOM_ID,
                     numPlayers: numPlayers,
                     rows: nextRows,
-                    cols: nextCols,
-                    isCustom: isCustomGrid
+                    cols: nextCols
                 });
             }
         }
         
-        // Grid Selection Logic
         window.selectGrid = function (r, c, btn) {
             nextRows = r;
             nextCols = c;
-            isCustomGrid = false;
-            customGridInputs.classList.add('hidden');
-
-            updateGridButtons(btn);
-            broadcastLobbyUpdate();
-        }
-
-        window.toggleCustomGrid = function (btn) {
-            isCustomGrid = true;
-            customGridInputs.classList.remove('hidden');
-
-            // Read current input values
-            nextRows = parseInt(document.getElementById('customRows').value) || 9;
-            nextCols = parseInt(document.getElementById('customCols').value) || 6;
-
             updateGridButtons(btn);
             broadcastLobbyUpdate();
         }
@@ -902,7 +733,6 @@
             width = container.clientWidth;
             height = container.clientHeight;
 
-            // High DPI Canvas
             const dpr = window.devicePixelRatio || 1;
             canvas.width = width * dpr;
             canvas.height = height * dpr;
@@ -910,7 +740,6 @@
             canvas.style.height = `${height}px`;
             ctx.scale(dpr, dpr);
 
-            // Add margin around the grid
             const margin = 20;
             const availableWidth = width - (margin * 2);
             const availableHeight = height - (margin * 2);
@@ -920,28 +749,23 @@
 
             cellSize = Math.min(cellW, cellH);
 
-            // Center the grid
             const gridW = cols * cellSize;
             const gridH = rows * cellSize;
             ctx.translate((width - gridW) / 2, (height - gridH) / 2);
 
-            // Store offset for input calculation
             canvas.offsetX = (width - gridW) / 2;
             canvas.offsetY = (height - gridH) / 2;
         }
 
         function startGame(isFromHostBroadcast) {
-            // FIX: If the browser passed a MouseEvent from a click, ignore it and set to false
             if (typeof isFromHostBroadcast !== 'boolean') {
                 isFromHostBroadcast = false;
             }
 
-            // NEW: Hard block to completely prevent the Host from starting alone
             if (myPlayerId === 0 && isFromHostBroadcast === false && connectedPlayersCount < 2) {
-                return; // Stop the function completely!
+                return; 
             }
 
-            // If I am the host and I clicked play, tell the server to start the game for others
             if (myPlayerId === 0 && isFromHostBroadcast === false) {
                 socket.emit('hostStartedGame', {
                     roomId: ROOM_ID,
@@ -951,21 +775,14 @@
                 });
             }
 
-            // Apply selected grid settings
-            if (isCustomGrid) {
-                nextRows = Math.max(2, Math.min(20, parseInt(document.getElementById('customRows').value)));
-                nextCols = Math.max(2, Math.min(20, parseInt(document.getElementById('customCols').value)));
-            }
             rows = nextRows;
             cols = nextCols;
             
             handleResize();
 
             menuOverlay.classList.add('hidden');
-            // Show game controls
             gameControls.classList.remove('hidden');
 
-            // Initialize Players
             players = [];
             for (let i = 0; i < numPlayers; i++) {
                 players.push({
@@ -973,11 +790,10 @@
                     color: COLORS[i].main,
                     glow: COLORS[i].glow,
                     alive: true,
-                    timeLimit: 15 // NEW: Give everyone 15 seconds to start
+                    timeLimit: 15 
                 });
             }
 
-            // Initialize Grid
             grid = [];
             for (let r = 0; r < rows; r++) {
                 let row = [];
@@ -1003,28 +819,23 @@
             gameActive = true;
             checkWinCondition = false;
             projectiles = [];
-            moveHistory = []; // Reset history
+            moveHistory = []; 
             eliminationQueue = [];
             isShowingElimination = false;
             updateUndoUI();
-            startTimer(); // Starts the clock for Player 1!
+            startTimer(); 
         }
 
         function resetGameMenu() {
             gameActive = false;
             winnerOverlay.classList.add('hidden');
             menuOverlay.classList.remove('hidden');
-            // Hide game controls
             gameControls.classList.add('hidden');
             undoBtn.disabled = true;
             eliminationPopup.classList.add('hidden');
         }
 
-        /**
-         * Undo Logic
-         */
         function saveState() {
-            // Deep copy grid
             const gridCopy = grid.map(row => row.map(cell => ({ ...cell })));
             const playersCopy = players.map(p => ({ ...p }));
 
@@ -1037,12 +848,11 @@
             };
 
             moveHistory.push(state);
-            if (moveHistory.length > 50) moveHistory.shift(); // Limit history to last 50 moves
+            if (moveHistory.length > 50) moveHistory.shift(); 
             updateUndoUI();
         }
         
         function undoMove(isFromServer) {
-            // Protect against browser click events
             if (typeof isFromServer !== 'boolean') {
                 isFromServer = false;
             }
@@ -1058,9 +868,8 @@
             checkWinCondition = previousState.checkWinCondition;
 
             updateUndoUI();
-            startTimer(); // Restart the clock for the undone turn!
+            startTimer(); 
 
-            // NEW: If I clicked the button myself, tell the server to broadcast it!
             if (isFromServer === false && socket) {
                 socket.emit('requestUndo', { roomId: ROOM_ID });
             }
@@ -1071,16 +880,9 @@
             undoBtn.style.opacity = (moveHistory.length === 0 || isAnimating) ? '0.3' : '1';
         }
 
-        /**
-         * Game Logic
-         */
-
-        
-        // Controls the "Your Turn" banner and countdown
         function updateTurnIndicator() {
             const indicator = document.getElementById('turnIndicator');
             
-            // Hide it if game is over or animating
             if (!gameActive || isAnimating) {
                 indicator.classList.add('hidden');
                 return;
@@ -1092,10 +894,8 @@
                 indicator.style.boxShadow = `0 0 20px ${p.glow}`;
                 indicator.style.color = (p.id === 2 || p.id === 5) ? 'black' : 'white'; 
                 
-                // Keep the UI showing 0s even if the internal backup clock goes negative
                 const displaySeconds = Math.max(0, currentSeconds);
 
-                // Show everyone the timer, but personalize the text
                 if (currentPlayerIndex === myPlayerId) {
                     indicator.innerText = `YOUR TURN (${displaySeconds}s)`;
                 } else {
@@ -1106,19 +906,17 @@
             }
         }
 
-        // Starts the countdown clock
         function startTimer() {
-            clearInterval(turnTimer); // Reset any existing clock
+            clearInterval(turnTimer); 
             if (!gameActive || isAnimating) return;
 
             currentSeconds = players[currentPlayerIndex].timeLimit;
-            updateTurnIndicator(); // Instantly show starting time
+            updateTurnIndicator(); 
 
             turnTimer = setInterval(() => {
                 currentSeconds--;
                 updateTurnIndicator();
 
-                // 1. Normal AFK: If the app is open, the active player skips themselves at exactly 0.
                 if (currentSeconds === 0) {
                     if (currentPlayerIndex === myPlayerId && socket) {
                         clearInterval(turnTimer);
@@ -1126,8 +924,6 @@
                         processTimeout();
                     }
                 } 
-                // 2. App Closed (Ghost Player): If the player swiped the app away, their clock is dead.
-                // We use a "cascading" backup timer. Player 0 acts as referee at -3s, Player 1 at -4s, etc.
                 else if (currentSeconds < 0) {
                     const backupTriggerTime = -3 - myPlayerId; 
                     
@@ -1140,19 +936,17 @@
                         }
                     }
                 }
-            }, 1000); // Ticks every 1 second
+            }, 1000); 
         }
-        // Handles the penalty and skipping the turn
+
         function processTimeout() {
             clearInterval(turnTimer);
             if (!gameActive || isAnimating) return;
 
-            // Penalty logic: Decrease their future time limit
             let p = players[currentPlayerIndex];
             if (p.timeLimit === 15) p.timeLimit = 10;
             else if (p.timeLimit === 10) p.timeLimit = 5;
 
-            // Skip them and start the next person's clock
             nextTurn();
             startTimer();
         }
@@ -1160,7 +954,6 @@
         function handleInput(e) {
             if (!gameActive || isAnimating) return;
             
-            // Spectators and players out of turn get blocked here
             if (currentPlayerIndex !== myPlayerId) {
                 console.log("Not your turn!");
                 return; 
@@ -1188,23 +981,18 @@
         function attemptMove(r, c) {
             const cell = grid[r][c];
 
-            // Only allow the move if it's valid
             if (cell.owner === null || cell.owner === currentPlayerIndex) {
-                // 1. Tell the server we made a move!
                 socket.emit('makeMove', { roomId: ROOM_ID, r: r, c: c });
-                
-                // 2. Process our own move locally
                 processMove(r, c);
             }
         }
 
-        // This function actually does the game logic
         function processMove(r, c) {
-            clearInterval(turnTimer); // Stop the clock immediately!
+            clearInterval(turnTimer); 
             
             const cell = grid[r][c];
             
-            players[currentPlayerIndex].timeLimit = 15; // Reset their future time back to 15s because they acted!
+            players[currentPlayerIndex].timeLimit = 15; 
             
             saveState(); 
             cell.owner = currentPlayerIndex;
@@ -1216,7 +1004,6 @@
         }
 
         function resolveState() {
-            // === Check for immediate winner ===
             if (checkWinCondition) {
                 const activeOwners = new Set();
                 for (let r = 0; r < rows; r++) {
@@ -1228,16 +1015,14 @@
                 }
 
                 if (activeOwners.size === 1) {
-                    // IMMEDIATE WIN DECLARATION
                     isAnimating = false;
-                    projectiles = []; // Clear any remaining flying dots
+                    projectiles = []; 
                     const winnerId = activeOwners.values().next().value;
                     declareWinner(winnerId);
-                    return; // Stop recursion
+                    return; 
                 }
             }
 
-            // Find unstable cells
             let unstable = [];
             for (let r = 0; r < rows; r++) {
                 for (let c = 0; c < cols; c++) {
@@ -1249,8 +1034,8 @@
 
             if (unstable.length > 0) {
                 isAnimating = true;
-                clearInterval(turnTimer); // Pause clock while exploding!
-                updateUndoUI(); // Keep undo disabled
+                clearInterval(turnTimer); 
+                updateUndoUI(); 
                 updateTurnIndicator();
 
                 unstable.forEach(cell => {
@@ -1261,16 +1046,15 @@
 
             } else {
                 isAnimating = false;
-                updateUndoUI(); // Re-enable undo
+                updateUndoUI(); 
 
-                // Logic check after animations settle
                 if (checkWinCondition) {
                     checkEliminations();
                 }
 
                 if (gameActive) {
                     nextTurn();
-                    startTimer(); // Start the clock for the next player!
+                    startTimer(); 
                 }
             }
         }
@@ -1278,7 +1062,6 @@
         function checkEliminations() {
             if (!gameActive) return;
 
-            // Count orbs for each player
             const orbCounts = new Array(numPlayers).fill(0);
             for (let r = 0; r < rows; r++) {
                 for (let c = 0; c < cols; c++) {
@@ -1288,7 +1071,6 @@
                 }
             }
 
-            // Check if any previously alive player is now at 0 orbs
             players.forEach(p => {
                 if (p.alive && orbCounts[p.id] === 0) {
                     p.alive = false;
@@ -1315,15 +1097,13 @@
             eliminationPopup.style.boxShadow = `0 0 30px ${p.glow}`;
 
             eliminationPopup.classList.remove('hidden');
-            eliminationPopup.classList.remove('animate-elimination'); // Reset animation
-            void eliminationPopup.offsetWidth; // Trigger reflow
+            eliminationPopup.classList.remove('animate-elimination'); 
+            void eliminationPopup.offsetWidth; 
             eliminationPopup.classList.add('animate-elimination');
 
-            // Hide after 1s and process next
             setTimeout(() => {
                 eliminationPopup.classList.add('hidden');
                 isShowingElimination = false;
-                // Check if there are more in queue
                 if (eliminationQueue.length > 0) {
                     processEliminationQueue();
                 }
@@ -1355,7 +1135,6 @@
         }
 
         function nextTurn() {
-            // Enable win checking after everyone has played roughly once
             if (!checkWinCondition && totalMoves >= numPlayers) {
                 checkWinCondition = true;
             }
@@ -1370,12 +1149,11 @@
 
         function declareWinner(playerId) {
             gameActive = false;
-            clearInterval(turnTimer); // Stop clock when game ends!
+            clearInterval(turnTimer); 
             const p = players[playerId];
-            // Keep color name for winner as requested previously
             winnerText.innerText = `${COLORS[playerId].name} WON!`;
             winnerIcon.style.backgroundColor = p.color;
-            winnerIcon.style.color = 'black'; /* Changed text to black for better contrast on light winner colors like White/Yellow */
+            winnerIcon.style.color = 'black'; 
             winnerIcon.style.borderColor = p.color;
             winnerIcon.style.boxShadow = `0 0 50px ${p.glow}`;
             winnerOverlay.classList.remove('hidden');
@@ -1383,9 +1161,6 @@
             updateTurnIndicator();
         }
 
-        /**
-         * Rendering & Animation Loop
-         */
         function gameLoop() {
             ctx.save();
             ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1401,7 +1176,7 @@
                 return;
             }
 
-            drawHighlights(); // Add highlights before grid lines
+            drawHighlights(); 
             drawGrid();
             updateAndDrawProjectiles();
 
@@ -1415,32 +1190,28 @@
             if (!activePlayer) return;
 
             ctx.fillStyle = activePlayer.main;
-            ctx.globalAlpha = 0.15; // Very subtle light shade
+            ctx.globalAlpha = 0.15; 
 
             for (let r = 0; r < rows; r++) {
                 for (let c = 0; c < cols; c++) {
                     const cell = grid[r][c];
-                    // Highlight only cells owned by the current player as requested
-                    // "empty grids should remain same"
                     if (cell.owner === currentPlayerIndex) {
                         ctx.fillRect(cell.c * cellSize, cell.r * cellSize, cellSize, cellSize);
                     }
                 }
             }
 
-            ctx.globalAlpha = 1.0; // Reset alpha
+            ctx.globalAlpha = 1.0; 
         }
 
         function drawGrid() {
-            // Dynamic line width based on toggle
             ctx.lineWidth = isThickGrid ? 3 : 1;
 
             if (gameActive && players[currentPlayerIndex]) {
                 const c = players[currentPlayerIndex].color;
                 ctx.strokeStyle = c;
-                // If thick grid is on, we might want it slightly more opaque to pop, or keep it subtle
                 ctx.globalAlpha = isThickGrid ? 0.6 : 0.4;
-                ctx.shadowBlur = 10; // Increased blur for grid lines
+                ctx.shadowBlur = 10; 
                 ctx.shadowColor = c;
             } else {
                 ctx.strokeStyle = '#333';
@@ -1475,9 +1246,8 @@
             let cx = cell.c * cellSize + cellSize / 2;
             let cy = cell.r * cellSize + cellSize / 2;
 
-            // Shake effect for critical mass (one orb away from explosion)
             if (cell.count === cell.capacity - 1) {
-                const shakeIntensity = cellSize * 0.05; // 5% of cell size
+                const shakeIntensity = cellSize * 0.05; 
                 cx += (Math.random() - 0.5) * shakeIntensity;
                 cy += (Math.random() - 0.5) * shakeIntensity;
             }
@@ -1486,7 +1256,6 @@
 
             ctx.fillStyle = color;
 
-            // Only glow if it's the owner's turn
             if (cell.owner === currentPlayerIndex) {
                 ctx.shadowBlur = 30;
                 ctx.shadowColor = color;
@@ -1547,8 +1316,8 @@
                     const currY = p.startY + (p.targetY - p.startY) * p.progress;
 
                     ctx.fillStyle = players[p.owner].color;
-                    ctx.shadowColor = players[p.owner].color; // Stronger glow
-                    ctx.shadowBlur = 20; // Stronger blur
+                    ctx.shadowColor = players[p.owner].color; 
+                    ctx.shadowBlur = 20; 
                     ctx.beginPath();
                     ctx.arc(currX, currY, cellSize * 0.15, 0, Math.PI * 2);
                     ctx.fill();
@@ -1565,4 +1334,3 @@
     </script>
 </body>
 </html>
-
