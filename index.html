@@ -256,9 +256,6 @@
             myPlayerId = id;
             
             if (myPlayerId !== 0) {
-                document.getElementById('startBtn').innerText = "WAITING FOR HOST...";
-                document.getElementById('startBtn').disabled = true;
-
                 document.getElementById('pDec').disabled = true;
                 document.getElementById('pInc').disabled = true;
                 document.getElementById('pDec').style.opacity = '0.5';
@@ -291,9 +288,19 @@
         let connectedPlayersCount = 1; 
         let lobbyPlayers = []; 
         
-        function updatePlayButtonState() {
+        // THE MASTER UI CONTROLLER
+        // This function dynamically changes what EVERYONE sees in the lobby instantly!
+        function updateLobbyUI() {
+            if (myPlayerId === 'spectator') return; // Spectators have their own screen
+
+            const statusText = document.getElementById('connectionStatus');
+            const startBtn = document.getElementById('startBtn');
+
             if (myPlayerId === 0) {
-                const startBtn = document.getElementById('startBtn');
+                // --- HOST LOGIC ---
+                statusText.innerText = `🟢 Connected: ${connectedPlayersCount}`;
+                statusText.style.color = '#4ade80';
+
                 if (connectedPlayersCount < numPlayers) {
                     const missing = numPlayers - connectedPlayersCount;
                     startBtn.innerText = `WAITING FOR ${missing} MORE...`;
@@ -304,6 +311,25 @@
                     startBtn.disabled = false;
                     startBtn.style.opacity = '1';
                 }
+            } else {
+                // --- GUEST LOGIC (Dynamic VIP Queue) ---
+                if (myPlayerId >= numPlayers) {
+                    // I am outside the allowed player count (e.g., I am player #3, but host selected 2)
+                    statusText.innerText = `🔴 Room is Full (Max ${numPlayers})`;
+                    statusText.style.color = '#ef4444'; // Red
+                    
+                    startBtn.innerText = "ROOM FULL";
+                    startBtn.disabled = true;
+                    startBtn.style.opacity = '0.5';
+                } else {
+                    // I am inside the allowed player count!
+                    statusText.innerText = `🟢 Connected: ${connectedPlayersCount}`;
+                    statusText.style.color = '#4ade80'; // Green
+                    
+                    startBtn.innerText = "WAITING FOR HOST...";
+                    startBtn.disabled = true;
+                    startBtn.style.opacity = '0.5';
+                }
             }
         }
 
@@ -311,14 +337,11 @@
             lobbyPlayers = playersArray;
             connectedPlayersCount = playersArray.length;
             
-            // NEW: Keep myPlayerId perfectly synced even if someone above me leaves the line!
+            // Keep myPlayerId perfectly synced even if someone above me leaves the line
             const myIndex = playersArray.findIndex(p => p.id === socket.id);
             if (myIndex !== -1 && myPlayerId !== 'spectator') {
                 myPlayerId = myIndex;
             }
-
-            const statusText = document.getElementById('connectionStatus');
-            if (statusText) statusText.innerText = `🟢 Connected: ${connectedPlayersCount}`;
 
             const listEl = document.getElementById('playerNamesList');
             if (listEl) {
@@ -336,10 +359,11 @@
                 });
             }
 
-            updatePlayButtonState();
+            // Immediately recalculate everyone's UI
+            updateLobbyUI();
         }); 
 
-        // NEW: This triggers if someone joins WHILE a game is running
+        // This triggers if someone joins AFTER the host clicked Play
         socket.on('roomFull', () => {
             const statusText = document.getElementById('connectionStatus');
             if (statusText) {
@@ -416,7 +440,7 @@
         });
 
         socket.on('lobbyUpdated', (data) => {
-            if (myPlayerId !== 0) {
+            if (myPlayerId !== 0 && myPlayerId !== 'spectator') {
                 numPlayers = data.numPlayers;
                 document.getElementById('playerCountDisplay').innerText = numPlayers;
 
@@ -430,6 +454,9 @@
                 if (nextRows === 5) btns[1].classList.add('active');
                 if (nextRows === 6) btns[2].classList.add('active');
                 if (nextRows === 8) btns[3].classList.add('active');
+                
+                // Immediately recalculate if I am now kicked out or allowed in!
+                updateLobbyUI();
             }
         });
 
@@ -541,7 +568,8 @@
             playerCountDisplay.innerText = numPlayers;
             broadcastLobbyUpdate(); 
             
-            updatePlayButtonState();
+            // Instantly update the Host's button when changing the target number
+            updateLobbyUI();
         }
 
         function handleResize() {
@@ -594,7 +622,7 @@
             rows = nextRows;
             cols = nextCols;
             
-            // NEW: The Queue Converter!
+            // THE QUEUE CONVERTER
             // If the game started, but my queue number is too high, I instantly become a spectator!
             if (myPlayerId >= numPlayers) {
                 myPlayerId = 'spectator';
@@ -606,7 +634,6 @@
 
             handleResize();
 
-            // THE FIX: Forcibly close BOTH menus so nobody gets stuck!
             menuOverlay.classList.add('hidden');
             winnerOverlay.classList.add('hidden'); 
             gameControls.classList.remove('hidden');
@@ -665,7 +692,6 @@
             undoBtn.disabled = true;
             eliminationPopup.classList.add('hidden');
 
-            // NEW: Tell the server to open the lobby doors again!
             if (myPlayerId === 0) {
                 socket.emit('returnToLobby', ROOM_ID);
             }
