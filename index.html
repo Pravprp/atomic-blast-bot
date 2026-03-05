@@ -205,7 +205,7 @@
                     <span>👑</span>
                 </div>
                 <h2 id="winnerText">PLAYER 1 WINS!</h2>
-                <p style="color: #9ca3af;">Tap anywhere to continue</p>
+                <p style="color: #9ca3af;">Tap anywhere to return to lobby</p>
             </div>
         </div>
 
@@ -311,6 +311,12 @@
             lobbyPlayers = playersArray;
             connectedPlayersCount = playersArray.length;
             
+            // NEW: Keep myPlayerId perfectly synced even if someone above me leaves the line!
+            const myIndex = playersArray.findIndex(p => p.id === socket.id);
+            if (myIndex !== -1 && myPlayerId !== 'spectator') {
+                myPlayerId = myIndex;
+            }
+
             const statusText = document.getElementById('connectionStatus');
             if (statusText) statusText.innerText = `🟢 Connected: ${connectedPlayersCount}`;
 
@@ -333,10 +339,11 @@
             updatePlayButtonState();
         }); 
 
-        socket.on('roomFull', (maxLimit) => {
+        // NEW: This triggers if someone joins WHILE a game is running
+        socket.on('roomFull', () => {
             const statusText = document.getElementById('connectionStatus');
             if (statusText) {
-                statusText.innerText = `👁️ Spectating (Max ${maxLimit} Players)`;
+                statusText.innerText = `👁️ Match in Progress`;
                 statusText.style.color = '#facc15'; 
             }
 
@@ -392,7 +399,7 @@
 
                 handleResize(); 
                 menuOverlay.classList.add('hidden'); 
-                winnerOverlay.classList.add('hidden'); // Also hide winner screen for spectators catching up!
+                winnerOverlay.classList.add('hidden'); 
                 gameControls.classList.remove('hidden');
                 updateTurnIndicator();
                 
@@ -587,9 +594,19 @@
             rows = nextRows;
             cols = nextCols;
             
+            // NEW: The Queue Converter!
+            // If the game started, but my queue number is too high, I instantly become a spectator!
+            if (myPlayerId >= numPlayers) {
+                myPlayerId = 'spectator';
+                menuOverlay.classList.add('hidden');
+                winnerOverlay.classList.add('hidden');
+                socket.emit('requestGameState', ROOM_ID);
+                return; 
+            }
+
             handleResize();
 
-            // THE FIX: Forcibly close BOTH menus when a game starts!
+            // THE FIX: Forcibly close BOTH menus so nobody gets stuck!
             menuOverlay.classList.add('hidden');
             winnerOverlay.classList.add('hidden'); 
             gameControls.classList.remove('hidden');
@@ -647,6 +664,11 @@
             gameControls.classList.add('hidden');
             undoBtn.disabled = true;
             eliminationPopup.classList.add('hidden');
+
+            // NEW: Tell the server to open the lobby doors again!
+            if (myPlayerId === 0) {
+                socket.emit('returnToLobby', ROOM_ID);
+            }
         }
 
         function saveState() {
