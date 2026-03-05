@@ -291,7 +291,6 @@
         let connectedPlayersCount = 1; 
         let lobbyPlayers = []; 
         
-        // --- NEW: Dynamic Play Button Logic ---
         function updatePlayButtonState() {
             if (myPlayerId === 0) {
                 const startBtn = document.getElementById('startBtn');
@@ -331,7 +330,6 @@
                 });
             }
 
-            // Immediately check if the button should be locked or unlocked
             updatePlayButtonState();
         }); 
 
@@ -394,6 +392,7 @@
 
                 handleResize(); 
                 menuOverlay.classList.add('hidden'); 
+                winnerOverlay.classList.add('hidden'); // Also hide winner screen for spectators catching up!
                 gameControls.classList.remove('hidden');
                 updateTurnIndicator();
                 
@@ -535,7 +534,6 @@
             playerCountDisplay.innerText = numPlayers;
             broadcastLobbyUpdate(); 
             
-            // Instantly check if we locked/unlocked the button when changing the target number!
             updatePlayButtonState();
         }
 
@@ -573,7 +571,6 @@
                 isFromHostBroadcast = false;
             }
 
-            // NEW: Hardblock checks if connected players matches the dynamic numPlayers selected!
             if (myPlayerId === 0 && isFromHostBroadcast === false && connectedPlayersCount < numPlayers) {
                 return; 
             }
@@ -592,7 +589,9 @@
             
             handleResize();
 
+            // THE FIX: Forcibly close BOTH menus when a game starts!
             menuOverlay.classList.add('hidden');
+            winnerOverlay.classList.add('hidden'); 
             gameControls.classList.remove('hidden');
 
             players = [];
