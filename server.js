@@ -98,8 +98,28 @@ io.on('connection', (socket) => {
         socket.to(data.roomId).emit('receiveMove', data);
     });
 
+    // --- OPTIMIZED DISCONNECT LOGIC ---
     socket.on('disconnect', () => {
         console.log(`Player disconnected: ${socket.id}`);
+        
+        // Search through all rooms to find where this player was
+        for (const roomId in rooms) {
+            const room = rooms[roomId];
+            const playerIndex = room.players.indexOf(socket.id);
+            
+            if (playerIndex !== -1) {
+                // Remove the player from the room
+                room.players.splice(playerIndex, 1);
+                io.to(roomId).emit('playerCountUpdate', room.players.length);
+                
+                // OPTIMIZATION: If the room is completely empty, delete it to free up RAM!
+                if (room.players.length === 0) {
+                    console.log(`Room ${roomId} is empty. Deleting to save memory.`);
+                    delete rooms[roomId];
+                }
+                break; // Stop searching once we found them
+            }
+        }
     });
 });
 
