@@ -112,23 +112,26 @@ const rawToken = process.env.TELEGRAM_BOT_TOKEN;
 const token = rawToken ? rawToken.trim() : undefined;
 const GAME_URL = 'https://atomic-blast.onrender.com'; 
 
-console.log("DEBUG - Token check:", token ? token.substring(0, 5) + "******" : "UNDEFINED!");
-
 if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
     const bot = new TelegramBot(token, { polling: true });
-
     bot.deleteWebHook().catch(console.error);
 
     bot.on('inline_query', (query) => {
-        console.log(`[BOT] Received inline query from: ${query.from.first_name}`);
-
         const results = [
             {
                 type: 'game',
                 id: query.id, 
-                game_short_name: 'atomicblast'
-                // FIX: We completely deleted the 'reply_markup' block here!
-                // Telegram will now perfectly auto-generate the native Play button itself.
+                game_short_name: 'atomicblast',
+                // THE FIX: We explicitly define ONLY the Play button. 
+                // This stops Telegram from auto-generating a second "Share" button!
+                reply_markup: {
+                    inline_keyboard: [[
+                        {
+                            text: "🎮 Enter Game",
+                            callback_game: {} 
+                        }
+                    ]]
+                }
             }
         ];
         
@@ -139,7 +142,6 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
 
     bot.on('callback_query', (query) => {
         if (query.game_short_name === 'atomicblast') {
-            
             let roomId = "ROOM";
             if (query.inline_message_id) {
                 roomId = query.inline_message_id.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10).toUpperCase();
@@ -148,7 +150,6 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
             }
 
             const gameLink = `${GAME_URL}/?room=${roomId}`;
-
             bot.answerCallbackQuery(query.id, { url: gameLink }).catch(console.error);
         }
     });
@@ -161,12 +162,8 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
 // --- AUTO PING TO PREVENT SLEEP ---
 setInterval(() => {
     https.get(GAME_URL + '/ping', (res) => {
-        if (res.statusCode === 200) {
-            console.log("Self-ping successful. Keeping the server awake.");
-        }
-    }).on('error', (err) => {
-        console.error("Self-ping failed:", err.message);
-    });
+        if (res.statusCode === 200) {}
+    }).on('error', (err) => {});
 }, 840000); 
 
 const PORT = process.env.PORT || 3000;
