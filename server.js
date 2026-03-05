@@ -23,7 +23,7 @@ app.get('/ping', (req, res) => {
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: { origin: "*", methods: ["GET", "POST"] },
-    cookie: false // <--- This proves to Telegram you are setting NO cookies!
+    cookie: false // Prove to Telegram you are setting NO cookies!
 });
 
 // We will store basic room info here
@@ -72,7 +72,6 @@ io.on('connection', (socket) => {
         // Send the board state specifically to the spectator who asked for it
         io.to(data.spectatorId).emit('spectatorCatchUp', data.state);
     });
-    // ---------------------------------
 
     socket.on('hostStartedGame', (data) => {
         console.log(`Game started in room ${data.roomId} with ${data.numPlayers} players`);
@@ -132,7 +131,7 @@ const GAME_URL = 'https://atomic-blast.onrender.com';
 console.log("DEBUG - Token check:", token ? token.substring(0, 5) + "******" : "UNDEFINED!");
 
 if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
-    // We go back to Polling. It is 100% reliable and fixes the "not responding" bug!
+    // Kept Polling TRUE: This prevents the bug where Render ignores Telegram's knocks!
     const bot = new TelegramBot(token, { polling: true });
 
     bot.deleteWebHook().catch(console.error);
@@ -141,29 +140,17 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
     bot.on('inline_query', (query) => {
         console.log(`[BOT] Received inline query from: ${query.from.first_name}`);
 
-        const randomRoom = Math.random().toString(36).substring(2, 8).toUpperCase();
-        const roomLink = `${GAME_URL}/?room=${randomRoom}`;
-
         const results = [
             {
-                // We switch back to 'article'. This completely kills the Privacy Popup and the Share Screen!
-                type: 'article',
+                // Official Game API Trigger
+                type: 'game',
                 id: query.id, 
-                title: 'Play Atomic Blast!',
-                description: 'Click to instantly drop the game in this chat.',
-                thumbnail_url: 'https://raw.githubusercontent.com/Pravprp/atomic-blast-bot/refs/heads/main/Image.png',
-                thumbnail_width: 120,
-                thumbnail_height: 120,
-                input_message_content: {
-                    // The stealth link trick to generate the big clickable image
-                    message_text: `[ ](${roomLink})💥 **Atomic Blast**\nI challenge you to a multiplayer match! Click the image or button below to join.`,
-                    parse_mode: 'Markdown'
-                },
+                game_short_name: 'atomicblast', // MUST match the short name from BotFather!
                 reply_markup: {
                     inline_keyboard: [[
                         {
-                            text: "🎮 Join Game",
-                            url: roomLink
+                            text: "🎮 Play Atomic Blast",
+                            callback_game: {} // This creates the native Telegram game button
                         }
                     ]]
                 }
@@ -171,14 +158,33 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
         ];
         
         bot.answerInlineQuery(query.id, results, { cache_time: 0 }).catch(err => {
-            console.error("\n[BOT ERROR] Telegram rejected the query!");
-            console.error("Reason:", err.response ? err.response.body : err.message);
+            console.error("\n[BOT ERROR]", err);
         });
     });
+
+    // --- THE INSTANT LAUNCHER ---
+    // This listens for the exact moment someone taps the native PLAY button
+    bot.on('callback_query', (query) => {
+        if (query.game_short_name === 'atomicblast') {
+            
+            // Generate a permanent multiplayer room for this specific chat bubble
+            let roomId = "ROOM";
+            if (query.inline_message_id) {
+                roomId = query.inline_message_id.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10).toUpperCase();
+            } else {
+                roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+            }
+
+            const gameLink = `${GAME_URL}/?room=${roomId}`;
+
+            // This command triggers the Official Telegram native game UI (with the privacy popup)
+            bot.answerCallbackQuery(query.id, { url: gameLink }).catch(console.error);
+        }
+    });
     
-    console.log("Telegram Bot logic initialized in Stealth Mode!");
+    console.log("Telegram Bot logic initialized with Official Game API!");
 } else {
-    console.log("WARNING: Telegram Bot is NOT running. Please replace 'YOUR_BOT_TOKEN_HERE' with your real token.");
+    console.log("WARNING: Telegram Bot is NOT running.");
 }
 
 // --- AUTO PING TO PREVENT SLEEP ---
@@ -194,7 +200,6 @@ setInterval(() => {
 }, 840000); 
 
 const PORT = process.env.PORT || 3000;
-// We add '0.0.0.0' so Render's port scanner instantly detects it!
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
 });
