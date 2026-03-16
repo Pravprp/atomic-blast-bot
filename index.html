@@ -31,12 +31,6 @@
         .absolute { position: absolute; }
         .relative { position: relative; }
         .inset-0 { top: 0; left: 0; right: 0; bottom: 0; }
-        .top-1\/2 { top: 50% !important; }
-        .left-1\/2 { left: 50% !important; }
-        .z-10 { z-index: 10; }
-        .z-20 { z-index: 20; }
-        .z-30 { z-index: 30; }
-        .z-40 { z-index: 40; }
         .w-full { width: 100%; }
         .h-screen { height: 100vh; }
         .text-center { text-align: center; }
@@ -47,7 +41,7 @@
         .top-bar {
             height: 3.5rem; padding: 0 1rem; background-color: #111827;
             border-bottom: 1px solid #1f2937; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            flex-shrink: 0;
+            flex-shrink: 0; z-index: 10; position: relative;
         }
 
         .game-title {
@@ -57,7 +51,7 @@
             background-clip: text;
         }
 
-        #game-container { background-color: #000; }
+        #game-container { background-color: #000; flex-grow: 1; position: relative; display: flex; align-items: center; justify-content: center;}
 
         .glass-panel {
             background: rgba(30, 30, 30, 0.95); backdrop-filter: blur(10px);
@@ -98,7 +92,7 @@
             letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.5rem;
         }
 
-        #winnerOverlay { background: rgba(0, 0, 0, 0.9); }
+        #winnerOverlay { background: rgba(0, 0, 0, 0.9); z-index: 30; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;}
         #winnerIcon {
             width: 6rem; height: 6rem; border-radius: 50%; margin: 0 auto 1rem auto;
             border: 4px solid white; display: flex; align-items: center; justify-content: center;
@@ -110,9 +104,24 @@
             background: rgba(17, 24, 39, 0.95); border: 2px solid white; padding: 1.5rem 2rem;
             border-radius: 1rem; min-width: 250px; pointer-events: none;
             backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-            transform: translate(-50%, -50%);
+            transform: translate(-50%, -50%); position: absolute; top: 50%; left: 50%; z-index: 40;
+            display: flex; flex-col; align-items: center; justify-content: center;
         }
 
+        /* --- NEW: TOAST NOTIFICATIONS --- */
+        #toastContainer {
+            position: absolute; top: 1rem; right: 1rem; z-index: 50; pointer-events: none;
+            display: flex; flex-direction: column; gap: 0.5rem;
+        }
+        .toast {
+            background: rgba(17, 24, 39, 0.95); border-left: 4px solid; color: white;
+            padding: 0.75rem 1rem; border-radius: 0.25rem; font-size: 0.875rem; font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            animation: slideInRight 0.3s ease-out forwards, fadeOutToast 0.3s ease-out 2.5s forwards;
+        }
+
+        @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes fadeOutToast { from { opacity: 1; } to { opacity: 0; } }
         @keyframes fadeOutScale {
             0% { opacity: 0; transform: translate(-50%, -40%) scale(0.8); }
             10% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
@@ -124,16 +133,17 @@
 </head>
 
 <body>
+    <div id="toastContainer"></div>
 
-    <div class="top-bar flex items-center justify-between z-10 relative">
+    <div class="top-bar flex items-center justify-between">
         <h1 class="game-title">Atomic Blast</h1>
     </div>
 
-    <div class="flex-grow relative flex items-center justify-center" id="game-container">
+    <div id="game-container">
         <canvas id="gameCanvas"></canvas>
 
-        <div id="turnIndicator" class="absolute z-10 hidden flex items-center justify-center" 
-             style="bottom: 2rem; padding: 0.75rem 2rem; border-radius: 2rem; font-weight: 900; letter-spacing: 2px; border: 2px solid white; pointer-events: none; transition: opacity 0.2s; font-size: 1.1rem; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+        <div id="turnIndicator" class="absolute hidden flex items-center justify-center" 
+             style="z-index: 10; bottom: 2rem; padding: 0.75rem 2rem; border-radius: 2rem; font-weight: 900; letter-spacing: 2px; border: 2px solid white; pointer-events: none; transition: opacity 0.2s; font-size: 1.1rem; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
             YOUR TURN
         </div>
 
@@ -178,18 +188,15 @@
             </div>
         </div>
 
-        <div id="winnerOverlay" class="absolute inset-0 flex items-center justify-center z-30 hidden">
+        <div id="winnerOverlay" class="hidden">
             <div class="text-center" style="padding: 1rem;">
-                <div id="winnerIcon">
-                    <span>👑</span>
-                </div>
+                <div id="winnerIcon"><span>👑</span></div>
                 <h2 id="winnerText">PLAYER 1 WINS!</h2>
                 <p style="color: #9ca3af;">Tap anywhere to return to lobby</p>
             </div>
         </div>
 
-        <div id="eliminationPopup"
-            class="absolute top-1/2 left-1/2 z-40 hidden flex flex-col items-center justify-center">
+        <div id="eliminationPopup" class="hidden">
             <span style="font-size: 1.875rem; margin-bottom: 0.5rem;">💀</span>
             <h2 id="eliminationText"
                 style="font-size: 1.5rem; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase;">RED
@@ -219,6 +226,14 @@
         const urlParams = new URLSearchParams(window.location.search);
         let ROOM_ID = urlParams.get('room');
         let PLAYER_NAME = urlParams.get('name') || "Player"; 
+        
+        // UNIQUE IDENTIFIER LOGIC
+        // If they didn't come from Telegram, generate a random ID and save it in their browser memory
+        let PLAYER_UID = urlParams.get('uid') || sessionStorage.getItem('atomic_uid');
+        if (!PLAYER_UID) {
+            PLAYER_UID = Math.random().toString(36).substring(2, 12);
+            sessionStorage.setItem('atomic_uid', PLAYER_UID);
+        }
 
         if (!ROOM_ID) {
             ROOM_ID = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -227,14 +242,27 @@
 
         let myPlayerId = null; 
 
+        // --- NEW: TOAST POPUP FUNCTION ---
+        function showToast(message, color) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.style.borderLeftColor = color;
+            toast.innerText = message;
+            container.appendChild(toast);
+            
+            // Removes it from the HTML after animation finishes
+            setTimeout(() => { if (toast.parentNode) toast.remove(); }, 3000);
+        }
+
         socket.on('connect', () => {
-            socket.emit('joinRoom', { roomId: ROOM_ID, playerName: PLAYER_NAME });
+            socket.emit('joinRoom', { roomId: ROOM_ID, playerName: PLAYER_NAME, uid: PLAYER_UID });
         });
 
         socket.on('assignPlayerId', (id) => {
             myPlayerId = id;
             
-            if (myPlayerId !== 0) {
+            if (myPlayerId !== 0 && myPlayerId !== 'spectator') {
                 document.getElementById('pDec').disabled = true;
                 document.getElementById('pInc').disabled = true;
                 document.getElementById('pDec').style.opacity = '0.5';
@@ -262,6 +290,15 @@
 
         socket.on('receiveMove', (data) => {
             processMove(data.r, data.c);
+        });
+
+        // Listen for people logging on and off!
+        socket.on('playerStatus', (data) => {
+            if (data.status === 'offline') {
+                showToast(`${data.name} went offline`, '#ef4444'); // Red
+            } else {
+                showToast(`${data.name} returned!`, '#4ade80'); // Green
+            }
         });
 
         let connectedPlayersCount = 1; 
@@ -308,7 +345,8 @@
 
         socket.on('lobbyPlayersUpdate', (playersArray) => {
             lobbyPlayers = playersArray;
-            connectedPlayersCount = playersArray.length;
+            // Only count people who are actively online!
+            connectedPlayersCount = playersArray.filter(p => p.online).length;
             
             const myIndex = playersArray.findIndex(p => p.id === socket.id);
             if (myIndex !== -1 && myPlayerId !== 'spectator') {
@@ -325,10 +363,15 @@
                     const li = document.createElement('li');
                     li.style.marginBottom = '0.4rem';
                     
+                    // Visually dim players who disconnected
+                    if (!p.online) li.style.opacity = '0.4';
+                    
+                    const statusTag = p.online ? '' : ' <span style="color:#ef4444; font-size:10px;">(Offline)</span>';
+
                     if (index === 0) {
-                        li.innerHTML = `⭐ <strong style="color:#facc15">${p.name}</strong> joined (Host)`;
+                        li.innerHTML = `⭐ <strong style="color:#facc15">${p.name}</strong> (Host)${statusTag}`;
                     } else {
-                        li.innerHTML = `🎮 <strong style="color:#60a5fa">${p.name}</strong> joined`;
+                        li.innerHTML = `🎮 <strong style="color:#60a5fa">${p.name}</strong>${statusTag}`;
                     }
                     listEl.appendChild(li);
                 });
@@ -365,8 +408,9 @@
             };
         }); 
 
+        // NEW: The server asks ANY active player to share the board state
         socket.on('hostPleaseSendState', (spectatorSocketId) => {
-            if (myPlayerId === 0) { 
+            if (gameActive) { 
                 const currentState = {
                     rows: rows,
                     cols: cols,
@@ -381,6 +425,7 @@
             }
         });
 
+        // This receives the live board from someone else and snaps you back into the game
         socket.on('spectatorCatchUp', (state) => {
             if (state.gameActive) {
                 rows = state.rows;
@@ -713,7 +758,6 @@
             if (!gameActive || isAnimating) return;
             
             if (currentPlayerIndex !== myPlayerId) {
-                console.log("Not your turn!");
                 return; 
             }
 
