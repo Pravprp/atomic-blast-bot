@@ -57,18 +57,6 @@
             background-clip: text;
         }
 
-        .control-btn {
-            background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2);
-            padding: 0.25rem 0.75rem; border-radius: 0.25rem; font-size: 0.875rem;
-            color: white; transition: all 0.2s;
-        }
-
-        .control-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.2); }
-        .control-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-        .opacity-70 { opacity: 0.7; }
-        .opacity-100 { opacity: 1; }
-        .bg-blue-600 { background-color: #2563eb !important; border-color: #3b82f6 !important; }
-
         #game-container { background-color: #000; }
 
         .glass-panel {
@@ -139,15 +127,6 @@
 
     <div class="top-bar flex items-center justify-between z-10 relative">
         <h1 class="game-title">Atomic Blast</h1>
-
-        <div id="gameControls" class="flex gap-2 hidden">
-            <button id="thickGridBtn" class="control-btn bg-blue-600 text-white opacity-100">
-                Bold Grid
-            </button>
-            <button id="undoBtn" class="control-btn flex items-center gap-2" disabled>
-                <span>↩</span> Undo
-            </button>
-        </div>
     </div>
 
     <div class="flex-grow relative flex items-center justify-center" id="game-container">
@@ -288,16 +267,13 @@
         let connectedPlayersCount = 1; 
         let lobbyPlayers = []; 
         
-        // THE MASTER UI CONTROLLER
-        // This function dynamically changes what EVERYONE sees in the lobby instantly!
         function updateLobbyUI() {
-            if (myPlayerId === 'spectator') return; // Spectators have their own screen
+            if (myPlayerId === 'spectator') return; 
 
             const statusText = document.getElementById('connectionStatus');
             const startBtn = document.getElementById('startBtn');
 
             if (myPlayerId === 0) {
-                // --- HOST LOGIC ---
                 statusText.innerText = `🟢 Connected: ${connectedPlayersCount}`;
                 statusText.style.color = '#4ade80';
 
@@ -312,19 +288,16 @@
                     startBtn.style.opacity = '1';
                 }
             } else {
-                // --- GUEST LOGIC (Dynamic VIP Queue) ---
                 if (myPlayerId >= numPlayers) {
-                    // I am outside the allowed player count (e.g., I am player #3, but host selected 2)
                     statusText.innerText = `🔴 Room is Full (Max ${numPlayers})`;
-                    statusText.style.color = '#ef4444'; // Red
+                    statusText.style.color = '#ef4444'; 
                     
                     startBtn.innerText = "ROOM FULL";
                     startBtn.disabled = true;
                     startBtn.style.opacity = '0.5';
                 } else {
-                    // I am inside the allowed player count!
                     statusText.innerText = `🟢 Connected: ${connectedPlayersCount}`;
-                    statusText.style.color = '#4ade80'; // Green
+                    statusText.style.color = '#4ade80'; 
                     
                     startBtn.innerText = "WAITING FOR HOST...";
                     startBtn.disabled = true;
@@ -337,11 +310,13 @@
             lobbyPlayers = playersArray;
             connectedPlayersCount = playersArray.length;
             
-            // Keep myPlayerId perfectly synced even if someone above me leaves the line
             const myIndex = playersArray.findIndex(p => p.id === socket.id);
             if (myIndex !== -1 && myPlayerId !== 'spectator') {
                 myPlayerId = myIndex;
             }
+
+            const statusText = document.getElementById('connectionStatus');
+            if (statusText) statusText.innerText = `🟢 Connected: ${connectedPlayersCount}`;
 
             const listEl = document.getElementById('playerNamesList');
             if (listEl) {
@@ -359,11 +334,9 @@
                 });
             }
 
-            // Immediately recalculate everyone's UI
             updateLobbyUI();
         }); 
 
-        // This triggers if someone joins AFTER the host clicked Play
         socket.on('roomFull', () => {
             const statusText = document.getElementById('connectionStatus');
             if (statusText) {
@@ -402,8 +375,7 @@
                     players: players, 
                     currentPlayerIndex: currentPlayerIndex,
                     gameActive: gameActive,
-                    currentSeconds: currentSeconds,
-                    moveHistory: moveHistory 
+                    currentSeconds: currentSeconds
                 };
                 socket.emit('hostRepliedWithState', { spectatorId: spectatorSocketId, state: currentState });
             }
@@ -419,12 +391,10 @@
                 currentPlayerIndex = state.currentPlayerIndex;
                 gameActive = state.gameActive;
                 currentSeconds = state.currentSeconds;
-                moveHistory = state.moveHistory;
 
                 handleResize(); 
                 menuOverlay.classList.add('hidden'); 
                 winnerOverlay.classList.add('hidden'); 
-                gameControls.classList.remove('hidden');
                 updateTurnIndicator();
                 
                 clearInterval(turnTimer);
@@ -455,13 +425,8 @@
                 if (nextRows === 6) btns[2].classList.add('active');
                 if (nextRows === 8) btns[3].classList.add('active');
                 
-                // Immediately recalculate if I am now kicked out or allowed in!
                 updateLobbyUI();
             }
-        });
-
-        socket.on('receiveUndo', () => {
-            undoMove(true); 
         });
 
         socket.on('receiveTimeoutSkip', () => {
@@ -473,7 +438,6 @@
         let width, height;
         let rows = 6, cols = 6;
         let nextRows = 6, nextCols = 6;
-        let isThickGrid = true; 
 
         let cellSize;
         let grid = [];
@@ -489,7 +453,6 @@
         let turnTimer = null;
         let currentSeconds = 15;
 
-        let moveHistory = [];
         let eliminationQueue = [];
         let isShowingElimination = false;
 
@@ -498,9 +461,6 @@
         const winnerText = document.getElementById('winnerText');
         const winnerIcon = document.getElementById('winnerIcon');
         const playerCountDisplay = document.getElementById('playerCountDisplay');
-        const undoBtn = document.getElementById('undoBtn');
-        const thickGridBtn = document.getElementById('thickGridBtn');
-        const gameControls = document.getElementById('gameControls');
         const eliminationPopup = document.getElementById('eliminationPopup');
         const eliminationText = document.getElementById('eliminationText');
 
@@ -517,18 +477,6 @@
             document.getElementById('pInc').onclick = () => updatePlayerCount(1);
             document.getElementById('pDec').onclick = () => updatePlayerCount(-1);
             document.getElementById('startBtn').onclick = startGame;
-            undoBtn.onclick = undoMove;
-
-            thickGridBtn.onclick = () => {
-                isThickGrid = !isThickGrid;
-                if (isThickGrid) {
-                    thickGridBtn.classList.remove('opacity-70');
-                    thickGridBtn.classList.add('bg-blue-600', 'text-white', 'opacity-100');
-                } else {
-                    thickGridBtn.classList.add('opacity-70');
-                    thickGridBtn.classList.remove('bg-blue-600', 'text-white', 'opacity-100');
-                }
-            };
 
             winnerOverlay.onclick = resetGameMenu;
 
@@ -568,7 +516,6 @@
             playerCountDisplay.innerText = numPlayers;
             broadcastLobbyUpdate(); 
             
-            // Instantly update the Host's button when changing the target number
             updateLobbyUI();
         }
 
@@ -622,8 +569,6 @@
             rows = nextRows;
             cols = nextCols;
             
-            // THE QUEUE CONVERTER
-            // If the game started, but my queue number is too high, I instantly become a spectator!
             if (myPlayerId >= numPlayers) {
                 myPlayerId = 'spectator';
                 menuOverlay.classList.add('hidden');
@@ -636,7 +581,6 @@
 
             menuOverlay.classList.add('hidden');
             winnerOverlay.classList.add('hidden'); 
-            gameControls.classList.remove('hidden');
 
             players = [];
             for (let i = 0; i < numPlayers; i++) {
@@ -677,10 +621,8 @@
             gameActive = true;
             checkWinCondition = false;
             projectiles = [];
-            moveHistory = []; 
             eliminationQueue = [];
             isShowingElimination = false;
-            updateUndoUI();
             startTimer(); 
         }
 
@@ -688,58 +630,11 @@
             gameActive = false;
             winnerOverlay.classList.add('hidden');
             menuOverlay.classList.remove('hidden');
-            gameControls.classList.add('hidden');
-            undoBtn.disabled = true;
             eliminationPopup.classList.add('hidden');
 
             if (myPlayerId === 0) {
                 socket.emit('returnToLobby', ROOM_ID);
             }
-        }
-
-        function saveState() {
-            const gridCopy = grid.map(row => row.map(cell => ({ ...cell })));
-            const playersCopy = players.map(p => ({ ...p }));
-
-            const state = {
-                grid: gridCopy,
-                players: playersCopy,
-                currentPlayerIndex,
-                totalMoves,
-                checkWinCondition
-            };
-
-            moveHistory.push(state);
-            if (moveHistory.length > 50) moveHistory.shift(); 
-            updateUndoUI();
-        }
-        
-        function undoMove(isFromServer) {
-            if (typeof isFromServer !== 'boolean') {
-                isFromServer = false;
-            }
-
-            if (isAnimating || moveHistory.length === 0 || !gameActive) return;
-
-            const previousState = moveHistory.pop();
-
-            grid = previousState.grid;
-            players = previousState.players;
-            currentPlayerIndex = previousState.currentPlayerIndex;
-            totalMoves = previousState.totalMoves;
-            checkWinCondition = previousState.checkWinCondition;
-
-            updateUndoUI();
-            startTimer(); 
-
-            if (isFromServer === false && socket) {
-                socket.emit('requestUndo', { roomId: ROOM_ID });
-            }
-        }
-
-        function updateUndoUI() {
-            undoBtn.disabled = moveHistory.length === 0 || isAnimating;
-            undoBtn.style.opacity = (moveHistory.length === 0 || isAnimating) ? '0.3' : '1';
         }
 
         function updateTurnIndicator() {
@@ -854,15 +749,12 @@
             clearInterval(turnTimer); 
             
             const cell = grid[r][c];
-            
             players[currentPlayerIndex].timeLimit = 15; 
             
-            saveState(); 
             cell.owner = currentPlayerIndex;
             cell.count++;
             totalMoves++;
 
-            updateUndoUI(); 
             resolveState();
         }
 
@@ -898,7 +790,6 @@
             if (unstable.length > 0) {
                 isAnimating = true;
                 clearInterval(turnTimer); 
-                updateUndoUI(); 
                 updateTurnIndicator();
 
                 unstable.forEach(cell => {
@@ -909,7 +800,6 @@
 
             } else {
                 isAnimating = false;
-                updateUndoUI(); 
 
                 if (checkWinCondition) {
                     checkEliminations();
@@ -1021,7 +911,6 @@
             winnerIcon.style.borderColor = p.color;
             winnerIcon.style.boxShadow = `0 0 50px ${p.glow}`;
             winnerOverlay.classList.remove('hidden');
-            undoBtn.disabled = true;
             updateTurnIndicator();
         }
 
@@ -1069,12 +958,12 @@
         }
 
         function drawGrid() {
-            ctx.lineWidth = isThickGrid ? 3 : 1;
+            ctx.lineWidth = 3;
 
             if (gameActive && players[currentPlayerIndex]) {
                 const c = players[currentPlayerIndex].color;
                 ctx.strokeStyle = c;
-                ctx.globalAlpha = isThickGrid ? 0.6 : 0.4;
+                ctx.globalAlpha = 0.6;
                 ctx.shadowBlur = 10; 
                 ctx.shadowColor = c;
             } else {
