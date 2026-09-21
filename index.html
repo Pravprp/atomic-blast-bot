@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Atomic Blast (Online)</title>
     <meta property="og:title" content="Atomic Blast" />
-    <meta property="og:description" content="I challenge you to a multiplayer match!" />
-    <meta property="og:image" content="https://raw.githubusercontent.com/Pravprp/atomic-blast-bot/refs/heads/main/Image.png" />
+    <meta property="og:description" content="Play real-time multiplayer Chain Reaction!" />
+    <meta property="og:image" content="/Image.png" />
     
     <style>
         * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
@@ -144,9 +144,6 @@
             <button id="thickGridBtn" class="control-btn bg-blue-600 text-white opacity-100">
                 Bold Grid
             </button>
-            <button id="undoBtn" class="control-btn flex items-center gap-2" disabled>
-                <span>↩</span> Undo
-            </button>
         </div>
     </div>
 
@@ -165,13 +162,13 @@
                     style="letter-spacing: 0.05em; font-size: 1.875rem; margin-bottom: 1.5rem;">NEW GAME</h2>
 
                 <p id="connectionStatus" style="color: #4ade80; font-weight: bold; margin-bottom: 0.5rem;">
-                     🟢 Connected: 1
+                     Connecting...
                 </p>
 
                 <div style="background: rgba(0,0,0,0.4); border-radius: 0.5rem; padding: 0.75rem; margin-bottom: 1.5rem; text-align: left; max-height: 120px; overflow-y: auto;">
                     <p style="color: #9ca3af; font-size: 0.75rem; font-weight: bold; margin-top: 0; margin-bottom: 0.5rem; text-transform: uppercase;">Players in Lobby</p>
                     <ul id="playerNamesList" style="list-style: none; padding: 0; margin: 0; font-size: 0.875rem;">
-                        </ul>
+                    </ul>
                 </div>
 
                 <div style="margin-bottom: 1.5rem;">
@@ -232,7 +229,6 @@
         ];
 
         const ORB_RADIUS_RATIO = 0.25; 
-        const CELL_PADDING = 2;
         const ANIMATION_SPEED = 0.15; 
 
         const socket = io();
@@ -241,21 +237,37 @@
         let ROOM_ID = urlParams.get('room');
         let PLAYER_NAME = urlParams.get('name') || "Player"; 
 
+        // Persistent Unique Identifier for seamless reconnects
+        let USER_ID = urlParams.get('uid');
+        if (!USER_ID) {
+            USER_ID = localStorage.getItem('atomic_blast_uid');
+            if (!USER_ID) {
+                USER_ID = 'usr_' + Math.random().toString(36).substring(2, 11);
+                localStorage.setItem('atomic_blast_uid', USER_ID);
+            }
+        }
+
         if (!ROOM_ID) {
             ROOM_ID = Math.random().toString(36).substring(2, 8).toUpperCase();
             try { window.history.replaceState({}, '', `?room=${ROOM_ID}`); } catch (error) {}
         }
 
         let myPlayerId = null; 
+        let connectedPlayersCount = 1; 
+        let lobbyPlayers = []; 
 
         socket.on('connect', () => {
-            socket.emit('joinRoom', { roomId: ROOM_ID, playerName: PLAYER_NAME });
+            socket.emit('joinRoom', { 
+                roomId: ROOM_ID, 
+                playerName: PLAYER_NAME, 
+                uid: USER_ID 
+            });
         });
 
         socket.on('assignPlayerId', (id) => {
             myPlayerId = id;
             
-            if (myPlayerId !== 0) {
+            if (myPlayerId !== 0 && myPlayerId !== 'spectator') {
                 document.getElementById('pDec').disabled = true;
                 document.getElementById('pInc').disabled = true;
                 document.getElementById('pDec').style.opacity = '0.5';
@@ -270,6 +282,7 @@
                     btn.style.cursor = 'not-allowed';
                 });
             }
+            updateLobbyUI();
         });
 
         socket.on('gameStartedByHost', (data) => {
@@ -285,20 +298,14 @@
             processMove(data.r, data.c);
         });
 
-        let connectedPlayersCount = 1; 
-        let lobbyPlayers = []; 
-        
-        // THE MASTER UI CONTROLLER
-        // This function dynamically changes what EVERYONE sees in the lobby instantly!
         function updateLobbyUI() {
-            if (myPlayerId === 'spectator') return; // Spectators have their own screen
+            if (myPlayerId === 'spectator') return;
 
             const statusText = document.getElementById('connectionStatus');
             const startBtn = document.getElementById('startBtn');
 
             if (myPlayerId === 0) {
-                // --- HOST LOGIC ---
-                statusText.innerText = `🟢 Connected: ${connectedPlayersCount}`;
+                statusText.innerText = `Connected: ${connectedPlayersCount}`;
                 statusText.style.color = '#4ade80';
 
                 if (connectedPlayersCount < numPlayers) {
@@ -312,19 +319,16 @@
                     startBtn.style.opacity = '1';
                 }
             } else {
-                // --- GUEST LOGIC (Dynamic VIP Queue) ---
                 if (myPlayerId >= numPlayers) {
-                    // I am outside the allowed player count (e.g., I am player #3, but host selected 2)
-                    statusText.innerText = `🔴 Room is Full (Max ${numPlayers})`;
-                    statusText.style.color = '#ef4444'; // Red
+                    statusText.innerText = `Room Full (Max ${numPlayers})`;
+                    statusText.style.color = '#ef4444';
                     
                     startBtn.innerText = "ROOM FULL";
                     startBtn.disabled = true;
                     startBtn.style.opacity = '0.5';
                 } else {
-                    // I am inside the allowed player count!
-                    statusText.innerText = `🟢 Connected: ${connectedPlayersCount}`;
-                    statusText.style.color = '#4ade80'; // Green
+                    statusText.innerText = `Connected: ${connectedPlayersCount}`;
+                    statusText.style.color = '#4ade80';
                     
                     startBtn.innerText = "WAITING FOR HOST...";
                     startBtn.disabled = true;
@@ -337,8 +341,7 @@
             lobbyPlayers = playersArray;
             connectedPlayersCount = playersArray.length;
             
-            // Keep myPlayerId perfectly synced even if someone above me leaves the line
-            const myIndex = playersArray.findIndex(p => p.id === socket.id);
+            const myIndex = playersArray.findIndex(p => p.uid === USER_ID);
             if (myIndex !== -1 && myPlayerId !== 'spectator') {
                 myPlayerId = myIndex;
             }
@@ -349,25 +352,24 @@
                 playersArray.forEach((p, index) => {
                     const li = document.createElement('li');
                     li.style.marginBottom = '0.4rem';
+                    const statusTag = p.online ? '' : ' <span style="color:#ef4444">(Offline)</span>';
                     
                     if (index === 0) {
-                        li.innerHTML = `⭐ <strong style="color:#facc15">${p.name}</strong> joined (Host)`;
+                        li.innerHTML = `Host: <strong style="color:#facc15">${p.name}</strong>${statusTag}`;
                     } else {
-                        li.innerHTML = `🎮 <strong style="color:#60a5fa">${p.name}</strong> joined`;
+                        li.innerHTML = `Player: <strong style="color:#60a5fa">${p.name}</strong>${statusTag}`;
                     }
                     listEl.appendChild(li);
                 });
             }
 
-            // Immediately recalculate everyone's UI
             updateLobbyUI();
         }); 
 
-        // This triggers if someone joins AFTER the host clicked Play
         socket.on('roomFull', () => {
             const statusText = document.getElementById('connectionStatus');
             if (statusText) {
-                statusText.innerText = `👁️ Match in Progress`;
+                statusText.innerText = `Match in Progress`;
                 statusText.style.color = '#facc15'; 
             }
 
@@ -393,7 +395,7 @@
         }); 
 
         socket.on('hostPleaseSendState', (spectatorSocketId) => {
-            if (myPlayerId === 0) { 
+            if (myPlayerId === 0 || myPlayerId === 1) { 
                 const currentState = {
                     rows: rows,
                     cols: cols,
@@ -402,8 +404,7 @@
                     players: players, 
                     currentPlayerIndex: currentPlayerIndex,
                     gameActive: gameActive,
-                    currentSeconds: currentSeconds,
-                    moveHistory: moveHistory 
+                    currentSeconds: currentSeconds
                 };
                 socket.emit('hostRepliedWithState', { spectatorId: spectatorSocketId, state: currentState });
             }
@@ -419,24 +420,22 @@
                 currentPlayerIndex = state.currentPlayerIndex;
                 gameActive = state.gameActive;
                 currentSeconds = state.currentSeconds;
-                moveHistory = state.moveHistory;
 
                 handleResize(); 
                 menuOverlay.classList.add('hidden'); 
                 winnerOverlay.classList.add('hidden'); 
                 gameControls.classList.remove('hidden');
-                updateTurnIndicator();
                 
-                clearInterval(turnTimer);
-                turnTimer = setInterval(() => {
-                    currentSeconds--;
-                    updateTurnIndicator();
-                }, 1000);
+                startTimer();
             } else {
                 const startBtn = document.getElementById('startBtn');
                 startBtn.innerText = "WAITING FOR HOST...";
                 startBtn.disabled = true;
             }
+        });
+
+        socket.on('resetToLobby', () => {
+            resetGameMenu(false);
         });
 
         socket.on('lobbyUpdated', (data) => {
@@ -455,20 +454,14 @@
                 if (nextRows === 6) btns[2].classList.add('active');
                 if (nextRows === 8) btns[3].classList.add('active');
                 
-                // Immediately recalculate if I am now kicked out or allowed in!
                 updateLobbyUI();
             }
-        });
-
-        socket.on('receiveUndo', () => {
-            undoMove(true); 
         });
 
         socket.on('receiveTimeoutSkip', () => {
             processTimeout();
         });
 
-        // -------------------------
         let canvas, ctx;
         let width, height;
         let rows = 6, cols = 6;
@@ -489,7 +482,6 @@
         let turnTimer = null;
         let currentSeconds = 15;
 
-        let moveHistory = [];
         let eliminationQueue = [];
         let isShowingElimination = false;
 
@@ -498,7 +490,6 @@
         const winnerText = document.getElementById('winnerText');
         const winnerIcon = document.getElementById('winnerIcon');
         const playerCountDisplay = document.getElementById('playerCountDisplay');
-        const undoBtn = document.getElementById('undoBtn');
         const thickGridBtn = document.getElementById('thickGridBtn');
         const gameControls = document.getElementById('gameControls');
         const eliminationPopup = document.getElementById('eliminationPopup');
@@ -509,15 +500,12 @@
             ctx = canvas.getContext('2d');
 
             if (screen.orientation && screen.orientation.lock) {
-                screen.orientation.lock('portrait').catch(err => {
-                    console.log("Orientation lock not supported:", err);
-                });
+                screen.orientation.lock('portrait').catch(() => {});
             }
 
             document.getElementById('pInc').onclick = () => updatePlayerCount(1);
             document.getElementById('pDec').onclick = () => updatePlayerCount(-1);
-            document.getElementById('startBtn').onclick = startGame;
-            undoBtn.onclick = undoMove;
+            document.getElementById('startBtn').onclick = () => startGame(false);
 
             thickGridBtn.onclick = () => {
                 isThickGrid = !isThickGrid;
@@ -530,7 +518,7 @@
                 }
             };
 
-            winnerOverlay.onclick = resetGameMenu;
+            winnerOverlay.onclick = () => resetGameMenu(true);
 
             window.addEventListener('resize', handleResize);
             canvas.addEventListener('mousedown', handleInput);
@@ -556,7 +544,7 @@
             nextCols = c;
             updateGridButtons(btn);
             broadcastLobbyUpdate();
-        }
+        };
 
         function updateGridButtons(activeBtn) {
             document.querySelectorAll('.grid-btn').forEach(b => b.classList.remove('active'));
@@ -567,8 +555,6 @@
             numPlayers = Math.max(2, Math.min(8, numPlayers + delta));
             playerCountDisplay.innerText = numPlayers;
             broadcastLobbyUpdate(); 
-            
-            // Instantly update the Host's button when changing the target number
             updateLobbyUI();
         }
 
@@ -606,11 +592,11 @@
                 isFromHostBroadcast = false;
             }
 
-            if (myPlayerId === 0 && isFromHostBroadcast === false && connectedPlayersCount < numPlayers) {
+            if (myPlayerId === 0 && !isFromHostBroadcast && connectedPlayersCount < numPlayers) {
                 return; 
             }
 
-            if (myPlayerId === 0 && isFromHostBroadcast === false) {
+            if (myPlayerId === 0 && !isFromHostBroadcast) {
                 socket.emit('hostStartedGame', {
                     roomId: ROOM_ID,
                     rows: nextRows,
@@ -622,8 +608,6 @@
             rows = nextRows;
             cols = nextCols;
             
-            // THE QUEUE CONVERTER
-            // If the game started, but my queue number is too high, I instantly become a spectator!
             if (myPlayerId >= numPlayers) {
                 myPlayerId = 'spectator';
                 menuOverlay.classList.add('hidden');
@@ -640,7 +624,7 @@
 
             players = [];
             for (let i = 0; i < numPlayers; i++) {
-                let pName = lobbyPlayers[i] ? lobbyPlayers[i].name : `Player ${i+1}`;
+                let pName = lobbyPlayers[i] ? lobbyPlayers[i].name : `Player ${i + 1}`;
                 
                 players.push({
                     id: i,
@@ -677,69 +661,22 @@
             gameActive = true;
             checkWinCondition = false;
             projectiles = [];
-            moveHistory = []; 
             eliminationQueue = [];
             isShowingElimination = false;
-            updateUndoUI();
             startTimer(); 
         }
 
-        function resetGameMenu() {
+        function resetGameMenu(notifyServer) {
             gameActive = false;
+            clearInterval(turnTimer);
             winnerOverlay.classList.add('hidden');
             menuOverlay.classList.remove('hidden');
             gameControls.classList.add('hidden');
-            undoBtn.disabled = true;
             eliminationPopup.classList.add('hidden');
 
-            if (myPlayerId === 0) {
+            if (notifyServer && myPlayerId === 0) {
                 socket.emit('returnToLobby', ROOM_ID);
             }
-        }
-
-        function saveState() {
-            const gridCopy = grid.map(row => row.map(cell => ({ ...cell })));
-            const playersCopy = players.map(p => ({ ...p }));
-
-            const state = {
-                grid: gridCopy,
-                players: playersCopy,
-                currentPlayerIndex,
-                totalMoves,
-                checkWinCondition
-            };
-
-            moveHistory.push(state);
-            if (moveHistory.length > 50) moveHistory.shift(); 
-            updateUndoUI();
-        }
-        
-        function undoMove(isFromServer) {
-            if (typeof isFromServer !== 'boolean') {
-                isFromServer = false;
-            }
-
-            if (isAnimating || moveHistory.length === 0 || !gameActive) return;
-
-            const previousState = moveHistory.pop();
-
-            grid = previousState.grid;
-            players = previousState.players;
-            currentPlayerIndex = previousState.currentPlayerIndex;
-            totalMoves = previousState.totalMoves;
-            checkWinCondition = previousState.checkWinCondition;
-
-            updateUndoUI();
-            startTimer(); 
-
-            if (isFromServer === false && socket) {
-                socket.emit('requestUndo', { roomId: ROOM_ID });
-            }
-        }
-
-        function updateUndoUI() {
-            undoBtn.disabled = moveHistory.length === 0 || isAnimating;
-            undoBtn.style.opacity = (moveHistory.length === 0 || isAnimating) ? '0.3' : '1';
         }
 
         function updateTurnIndicator() {
@@ -792,7 +729,6 @@
                     
                     if (currentSeconds === backupTriggerTime) {
                         clearInterval(turnTimer);
-                        console.log(`Active player completely disconnected! Player ${myPlayerId} is forcing the skip.`);
                         if (socket) {
                             socket.emit('timeoutSkip', { roomId: ROOM_ID });
                             processTimeout();
@@ -818,7 +754,6 @@
             if (!gameActive || isAnimating) return;
             
             if (currentPlayerIndex !== myPlayerId) {
-                console.log("Not your turn!");
                 return; 
             }
 
@@ -854,15 +789,12 @@
             clearInterval(turnTimer); 
             
             const cell = grid[r][c];
-            
             players[currentPlayerIndex].timeLimit = 15; 
             
-            saveState(); 
             cell.owner = currentPlayerIndex;
             cell.count++;
             totalMoves++;
 
-            updateUndoUI(); 
             resolveState();
         }
 
@@ -898,7 +830,6 @@
             if (unstable.length > 0) {
                 isAnimating = true;
                 clearInterval(turnTimer); 
-                updateUndoUI(); 
                 updateTurnIndicator();
 
                 unstable.forEach(cell => {
@@ -909,7 +840,6 @@
 
             } else {
                 isAnimating = false;
-                updateUndoUI(); 
 
                 if (checkWinCondition) {
                     checkEliminations();
@@ -1007,7 +937,6 @@
                 currentPlayerIndex = (currentPlayerIndex + 1) % numPlayers;
                 loopCount++;
             } while (!players[currentPlayerIndex].alive && loopCount < numPlayers + 1);
-
         }
 
         function declareWinner(playerId) {
@@ -1021,7 +950,6 @@
             winnerIcon.style.borderColor = p.color;
             winnerIcon.style.boxShadow = `0 0 50px ${p.glow}`;
             winnerOverlay.classList.remove('hidden');
-            undoBtn.disabled = true;
             updateTurnIndicator();
         }
 
@@ -1117,7 +1045,6 @@
             }
 
             const color = players[cell.owner].color;
-
             ctx.fillStyle = color;
 
             if (cell.owner === currentPlayerIndex) {
