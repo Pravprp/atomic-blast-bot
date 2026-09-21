@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Atomic Blast (Online)</title>
     <meta property="og:title" content="Atomic Blast" />
-    <meta property="og:description" content="Play real-time multiplayer Chain Reaction!" />
-    <meta property="og:image" content="/Image.png" />
+    <meta property="og:description" content="I challenge you to a multiplayer match!" />
+    <meta property="og:image" content="https://raw.githubusercontent.com/Pravprp/atomic-blast-bot/refs/heads/main/Image.png" />
     
     <style>
         * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
@@ -144,6 +144,9 @@
             <button id="thickGridBtn" class="control-btn bg-blue-600 text-white opacity-100">
                 Bold Grid
             </button>
+            <button id="undoBtn" class="control-btn flex items-center gap-2" disabled>
+                <span>↩</span> Undo
+            </button>
         </div>
     </div>
 
@@ -162,7 +165,7 @@
                     style="letter-spacing: 0.05em; font-size: 1.875rem; margin-bottom: 1.5rem;">NEW GAME</h2>
 
                 <p id="connectionStatus" style="color: #4ade80; font-weight: bold; margin-bottom: 0.5rem;">
-                     Connecting...
+                     🟢 Connected: 1
                 </p>
 
                 <div style="background: rgba(0,0,0,0.4); border-radius: 0.5rem; padding: 0.75rem; margin-bottom: 1.5rem; text-align: left; max-height: 120px; overflow-y: auto;">
@@ -229,6 +232,7 @@
         ];
 
         const ORB_RADIUS_RATIO = 0.25; 
+        const CELL_PADDING = 2;
         const ANIMATION_SPEED = 0.15; 
 
         const socket = io();
@@ -236,15 +240,10 @@
         const urlParams = new URLSearchParams(window.location.search);
         let ROOM_ID = urlParams.get('room');
         let PLAYER_NAME = urlParams.get('name') || "Player"; 
+        let UID = urlParams.get('uid');
 
-        // Persistent Unique Identifier for seamless reconnects
-        let USER_ID = urlParams.get('uid');
-        if (!USER_ID) {
-            USER_ID = localStorage.getItem('atomic_blast_uid');
-            if (!USER_ID) {
-                USER_ID = 'usr_' + Math.random().toString(36).substring(2, 11);
-                localStorage.setItem('atomic_blast_uid', USER_ID);
-            }
+        if (!UID) {
+            UID = 'guest_' + Math.random().toString(36).substring(2, 9);
         }
 
         if (!ROOM_ID) {
@@ -253,21 +252,15 @@
         }
 
         let myPlayerId = null; 
-        let connectedPlayersCount = 1; 
-        let lobbyPlayers = []; 
 
         socket.on('connect', () => {
-            socket.emit('joinRoom', { 
-                roomId: ROOM_ID, 
-                playerName: PLAYER_NAME, 
-                uid: USER_ID 
-            });
+            socket.emit('joinRoom', { roomId: ROOM_ID, playerName: PLAYER_NAME, uid: UID });
         });
 
         socket.on('assignPlayerId', (id) => {
             myPlayerId = id;
             
-            if (myPlayerId !== 0 && myPlayerId !== 'spectator') {
+            if (myPlayerId !== 0) {
                 document.getElementById('pDec').disabled = true;
                 document.getElementById('pInc').disabled = true;
                 document.getElementById('pDec').style.opacity = '0.5';
@@ -282,7 +275,6 @@
                     btn.style.cursor = 'not-allowed';
                 });
             }
-            updateLobbyUI();
         });
 
         socket.on('gameStartedByHost', (data) => {
@@ -298,6 +290,9 @@
             processMove(data.r, data.c);
         });
 
+        let connectedPlayersCount = 1; 
+        let lobbyPlayers = []; 
+        
         function updateLobbyUI() {
             if (myPlayerId === 'spectator') return;
 
@@ -305,7 +300,7 @@
             const startBtn = document.getElementById('startBtn');
 
             if (myPlayerId === 0) {
-                statusText.innerText = `Connected: ${connectedPlayersCount}`;
+                statusText.innerText = `🟢 Connected: ${connectedPlayersCount}`;
                 statusText.style.color = '#4ade80';
 
                 if (connectedPlayersCount < numPlayers) {
@@ -320,14 +315,14 @@
                 }
             } else {
                 if (myPlayerId >= numPlayers) {
-                    statusText.innerText = `Room Full (Max ${numPlayers})`;
+                    statusText.innerText = `🔴 Room is Full (Max ${numPlayers})`;
                     statusText.style.color = '#ef4444';
                     
                     startBtn.innerText = "ROOM FULL";
                     startBtn.disabled = true;
                     startBtn.style.opacity = '0.5';
                 } else {
-                    statusText.innerText = `Connected: ${connectedPlayersCount}`;
+                    statusText.innerText = `🟢 Connected: ${connectedPlayersCount}`;
                     statusText.style.color = '#4ade80';
                     
                     startBtn.innerText = "WAITING FOR HOST...";
@@ -341,7 +336,7 @@
             lobbyPlayers = playersArray;
             connectedPlayersCount = playersArray.length;
             
-            const myIndex = playersArray.findIndex(p => p.uid === USER_ID);
+            const myIndex = playersArray.findIndex(p => p.id === socket.id);
             if (myIndex !== -1 && myPlayerId !== 'spectator') {
                 myPlayerId = myIndex;
             }
@@ -352,12 +347,11 @@
                 playersArray.forEach((p, index) => {
                     const li = document.createElement('li');
                     li.style.marginBottom = '0.4rem';
-                    const statusTag = p.online ? '' : ' <span style="color:#ef4444">(Offline)</span>';
                     
                     if (index === 0) {
-                        li.innerHTML = `Host: <strong style="color:#facc15">${p.name}</strong>${statusTag}`;
+                        li.innerHTML = `⭐ <strong style="color:#facc15">${p.name}</strong> joined (Host)`;
                     } else {
-                        li.innerHTML = `Player: <strong style="color:#60a5fa">${p.name}</strong>${statusTag}`;
+                        li.innerHTML = `🎮 <strong style="color:#60a5fa">${p.name}</strong> joined`;
                     }
                     listEl.appendChild(li);
                 });
@@ -369,7 +363,7 @@
         socket.on('roomFull', () => {
             const statusText = document.getElementById('connectionStatus');
             if (statusText) {
-                statusText.innerText = `Match in Progress`;
+                statusText.innerText = `👁️ Match in Progress`;
                 statusText.style.color = '#facc15'; 
             }
 
@@ -395,7 +389,7 @@
         }); 
 
         socket.on('hostPleaseSendState', (spectatorSocketId) => {
-            if (myPlayerId === 0 || myPlayerId === 1) { 
+            if (myPlayerId === 0) { 
                 const currentState = {
                     rows: rows,
                     cols: cols,
@@ -404,7 +398,8 @@
                     players: players, 
                     currentPlayerIndex: currentPlayerIndex,
                     gameActive: gameActive,
-                    currentSeconds: currentSeconds
+                    currentSeconds: currentSeconds,
+                    moveHistory: moveHistory 
                 };
                 socket.emit('hostRepliedWithState', { spectatorId: spectatorSocketId, state: currentState });
             }
@@ -420,22 +415,24 @@
                 currentPlayerIndex = state.currentPlayerIndex;
                 gameActive = state.gameActive;
                 currentSeconds = state.currentSeconds;
+                moveHistory = state.moveHistory;
 
                 handleResize(); 
                 menuOverlay.classList.add('hidden'); 
                 winnerOverlay.classList.add('hidden'); 
                 gameControls.classList.remove('hidden');
+                updateTurnIndicator();
                 
-                startTimer();
+                clearInterval(turnTimer);
+                turnTimer = setInterval(() => {
+                    currentSeconds--;
+                    updateTurnIndicator();
+                }, 1000);
             } else {
                 const startBtn = document.getElementById('startBtn');
                 startBtn.innerText = "WAITING FOR HOST...";
                 startBtn.disabled = true;
             }
-        });
-
-        socket.on('resetToLobby', () => {
-            resetGameMenu(false);
         });
 
         socket.on('lobbyUpdated', (data) => {
@@ -456,6 +453,10 @@
                 
                 updateLobbyUI();
             }
+        });
+
+        socket.on('receiveUndo', () => {
+            undoMove(true); 
         });
 
         socket.on('receiveTimeoutSkip', () => {
@@ -482,6 +483,7 @@
         let turnTimer = null;
         let currentSeconds = 15;
 
+        let moveHistory = [];
         let eliminationQueue = [];
         let isShowingElimination = false;
 
@@ -490,6 +492,7 @@
         const winnerText = document.getElementById('winnerText');
         const winnerIcon = document.getElementById('winnerIcon');
         const playerCountDisplay = document.getElementById('playerCountDisplay');
+        const undoBtn = document.getElementById('undoBtn');
         const thickGridBtn = document.getElementById('thickGridBtn');
         const gameControls = document.getElementById('gameControls');
         const eliminationPopup = document.getElementById('eliminationPopup');
@@ -500,12 +503,15 @@
             ctx = canvas.getContext('2d');
 
             if (screen.orientation && screen.orientation.lock) {
-                screen.orientation.lock('portrait').catch(() => {});
+                screen.orientation.lock('portrait').catch(err => {
+                    console.log("Orientation lock not supported:", err);
+                });
             }
 
             document.getElementById('pInc').onclick = () => updatePlayerCount(1);
             document.getElementById('pDec').onclick = () => updatePlayerCount(-1);
-            document.getElementById('startBtn').onclick = () => startGame(false);
+            document.getElementById('startBtn').onclick = startGame;
+            undoBtn.onclick = undoMove;
 
             thickGridBtn.onclick = () => {
                 isThickGrid = !isThickGrid;
@@ -518,7 +524,7 @@
                 }
             };
 
-            winnerOverlay.onclick = () => resetGameMenu(true);
+            winnerOverlay.onclick = resetGameMenu;
 
             window.addEventListener('resize', handleResize);
             canvas.addEventListener('mousedown', handleInput);
@@ -544,7 +550,7 @@
             nextCols = c;
             updateGridButtons(btn);
             broadcastLobbyUpdate();
-        };
+        }
 
         function updateGridButtons(activeBtn) {
             document.querySelectorAll('.grid-btn').forEach(b => b.classList.remove('active'));
@@ -592,11 +598,11 @@
                 isFromHostBroadcast = false;
             }
 
-            if (myPlayerId === 0 && !isFromHostBroadcast && connectedPlayersCount < numPlayers) {
+            if (myPlayerId === 0 && isFromHostBroadcast === false && connectedPlayersCount < numPlayers) {
                 return; 
             }
 
-            if (myPlayerId === 0 && !isFromHostBroadcast) {
+            if (myPlayerId === 0 && isFromHostBroadcast === false) {
                 socket.emit('hostStartedGame', {
                     roomId: ROOM_ID,
                     rows: nextRows,
@@ -624,7 +630,7 @@
 
             players = [];
             for (let i = 0; i < numPlayers; i++) {
-                let pName = lobbyPlayers[i] ? lobbyPlayers[i].name : `Player ${i + 1}`;
+                let pName = lobbyPlayers[i] ? lobbyPlayers[i].name : `Player ${i+1}`;
                 
                 players.push({
                     id: i,
@@ -661,22 +667,69 @@
             gameActive = true;
             checkWinCondition = false;
             projectiles = [];
+            moveHistory = []; 
             eliminationQueue = [];
             isShowingElimination = false;
+            updateUndoUI();
             startTimer(); 
         }
 
-        function resetGameMenu(notifyServer) {
+        function resetGameMenu() {
             gameActive = false;
-            clearInterval(turnTimer);
             winnerOverlay.classList.add('hidden');
             menuOverlay.classList.remove('hidden');
             gameControls.classList.add('hidden');
+            undoBtn.disabled = true;
             eliminationPopup.classList.add('hidden');
 
-            if (notifyServer && myPlayerId === 0) {
+            if (myPlayerId === 0) {
                 socket.emit('returnToLobby', ROOM_ID);
             }
+        }
+
+        function saveState() {
+            const gridCopy = grid.map(row => row.map(cell => ({ ...cell })));
+            const playersCopy = players.map(p => ({ ...p }));
+
+            const state = {
+                grid: gridCopy,
+                players: playersCopy,
+                currentPlayerIndex,
+                totalMoves,
+                checkWinCondition
+            };
+
+            moveHistory.push(state);
+            if (moveHistory.length > 50) moveHistory.shift(); 
+            updateUndoUI();
+        }
+        
+        function undoMove(isFromServer) {
+            if (typeof isFromServer !== 'boolean') {
+                isFromServer = false;
+            }
+
+            if (isAnimating || moveHistory.length === 0 || !gameActive) return;
+
+            const previousState = moveHistory.pop();
+
+            grid = previousState.grid;
+            players = previousState.players;
+            currentPlayerIndex = previousState.currentPlayerIndex;
+            totalMoves = previousState.totalMoves;
+            checkWinCondition = previousState.checkWinCondition;
+
+            updateUndoUI();
+            startTimer(); 
+
+            if (isFromServer === false && socket) {
+                socket.emit('requestUndo', { roomId: ROOM_ID });
+            }
+        }
+
+        function updateUndoUI() {
+            undoBtn.disabled = moveHistory.length === 0 || isAnimating;
+            undoBtn.style.opacity = (moveHistory.length === 0 || isAnimating) ? '0.3' : '1';
         }
 
         function updateTurnIndicator() {
@@ -729,6 +782,7 @@
                     
                     if (currentSeconds === backupTriggerTime) {
                         clearInterval(turnTimer);
+                        console.log(`Active player completely disconnected! Player ${myPlayerId} is forcing the skip.`);
                         if (socket) {
                             socket.emit('timeoutSkip', { roomId: ROOM_ID });
                             processTimeout();
@@ -754,6 +808,7 @@
             if (!gameActive || isAnimating) return;
             
             if (currentPlayerIndex !== myPlayerId) {
+                console.log("Not your turn!");
                 return; 
             }
 
@@ -789,12 +844,15 @@
             clearInterval(turnTimer); 
             
             const cell = grid[r][c];
+            
             players[currentPlayerIndex].timeLimit = 15; 
             
+            saveState(); 
             cell.owner = currentPlayerIndex;
             cell.count++;
             totalMoves++;
 
+            updateUndoUI(); 
             resolveState();
         }
 
@@ -830,6 +888,7 @@
             if (unstable.length > 0) {
                 isAnimating = true;
                 clearInterval(turnTimer); 
+                updateUndoUI(); 
                 updateTurnIndicator();
 
                 unstable.forEach(cell => {
@@ -840,6 +899,7 @@
 
             } else {
                 isAnimating = false;
+                updateUndoUI(); 
 
                 if (checkWinCondition) {
                     checkEliminations();
@@ -937,6 +997,7 @@
                 currentPlayerIndex = (currentPlayerIndex + 1) % numPlayers;
                 loopCount++;
             } while (!players[currentPlayerIndex].alive && loopCount < numPlayers + 1);
+
         }
 
         function declareWinner(playerId) {
@@ -950,6 +1011,7 @@
             winnerIcon.style.borderColor = p.color;
             winnerIcon.style.boxShadow = `0 0 50px ${p.glow}`;
             winnerOverlay.classList.remove('hidden');
+            undoBtn.disabled = true;
             updateTurnIndicator();
         }
 
@@ -1045,6 +1107,7 @@
             }
 
             const color = players[cell.owner].color;
+
             ctx.fillStyle = color;
 
             if (cell.owner === currentPlayerIndex) {
