@@ -4,14 +4,12 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
 const TelegramBot = require('node-telegram-bot-api');
-const https = require('https');
+const https = require('https'); 
 
 const app = express();
 app.use(cors());
-app.use(express.json());
 
 app.use(express.static(__dirname));
-
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
@@ -23,42 +21,43 @@ app.get('/ping', (req, res) => {
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: { origin: "*", methods: ["GET", "POST"] },
-    cookie: false
+    cookie: false 
 });
 
 const rooms = {};
 
-// Clean external URL formatting
-const PUBLIC_URL = (process.env.RENDER_EXTERNAL_URL || process.env.GAME_URL || 'https://atomic-blast.onrender.com').replace(/\/$/, '');
-
-// --- MULTIPLAYER SOCKET LOGIC ---
+// --- MULTIPLAYER GAME LOGIC ---
 io.on('connection', (socket) => {
     console.log(`Connection opened: ${socket.id}`);
 
     socket.on('joinRoom', (data) => {
         const roomId = data.roomId;
         const playerName = data.playerName || 'Guest';
-        const uid = data.uid || socket.id;
+        const uid = data.uid;
 
         if (!rooms[roomId]) {
-            rooms[roomId] = { players: [], gameStarted: false };
+            rooms[roomId] = { players: [], gameStarted: false }; 
         }
 
         const room = rooms[roomId];
 
-        // 1. Reconnection Check
-        const existingPlayerIndex = room.players.findIndex(p => p.uid === uid);
-
+        // 1. IS THIS PERSON RECONNECTING?
+        const existingPlayerIndex = (uid !== undefined && uid !== null)
+            ? room.players.findIndex(p => p.uid === uid)
+            : -1;
+        
         if (existingPlayerIndex !== -1) {
+            // Restore previous seat
             const p = room.players[existingPlayerIndex];
-            p.id = socket.id;
-            p.online = true;
-
+            p.id = socket.id; 
+            p.online = true;  
+            
             socket.join(roomId);
-            console.log(`${playerName} reconnected to room ${roomId}`);
-
+            console.log(`${playerName} RECONNECTED to ${roomId}`);
+            
             socket.emit('assignPlayerId', existingPlayerIndex);
             io.to(roomId).emit('lobbyPlayersUpdate', room.players);
+            
             socket.to(roomId).emit('playerStatus', { name: playerName, status: 'online' });
 
             if (room.gameStarted) {
@@ -67,15 +66,15 @@ io.on('connection', (socket) => {
                     io.to(activePeer.id).emit('hostPleaseSendState', socket.id);
                 }
             }
-            return;
+            return; 
         }
 
-        // 2. New Player Connection
+        // 2. BRAND NEW PLAYER LOGIC
         socket.join(roomId);
 
         if (room.gameStarted) {
-            socket.emit('roomFull');
-            return;
+            socket.emit('roomFull'); 
+            return; 
         }
 
         const myPlayerId = room.players.length;
@@ -105,7 +104,6 @@ io.on('connection', (socket) => {
 
     socket.on('returnToLobby', (roomId) => {
         if (rooms[roomId]) rooms[roomId].gameStarted = false;
-        io.to(roomId).emit('resetToLobby');
     });
 
     socket.on('lobbyUpdate', (data) => {
@@ -124,79 +122,45 @@ io.on('connection', (socket) => {
         for (const roomId in rooms) {
             const room = rooms[roomId];
             const player = room.players.find(p => p.id === socket.id);
-
+            
             if (player) {
                 player.online = false;
-                console.log(`${player.name} disconnected from room ${roomId}`);
-
+                console.log(`${player.name} disconnected from ${roomId}`);
+                
                 socket.to(roomId).emit('playerStatus', { name: player.name, status: 'offline' });
                 io.to(roomId).emit('lobbyPlayersUpdate', room.players);
-
+                
                 const anyoneOnline = room.players.some(p => p.online);
                 if (!anyoneOnline) {
-                    console.log(`Room ${roomId} is empty. Purging memory.`);
+                    console.log(`Room ${roomId} is entirely empty. Deleting.`);
                     delete rooms[roomId];
                 }
-                break;
+                break; 
             }
         }
     });
 });
 
-// --- TELEGRAM BOT INTEGRATION ---
+// --- TELEGRAM BOT LOGIC ---
 const rawToken = process.env.TELEGRAM_BOT_TOKEN;
 const token = rawToken ? rawToken.trim() : undefined;
+const GAME_URL = 'https://atomic-blast.onrender.com'; 
 
 if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
-    const isProduction = Boolean(process.env.RENDER_EXTERNAL_URL || process.env.GAME_URL);
-    let bot;
+    const bot = new TelegramBot(token, { polling: true });
+    bot.deleteWebHook().catch(console.error);
 
-    if (isProduction) {
-        // Use Webhook mode on Render to avoid 409 polling conflicts during deploys
-        bot = new TelegramBot(token);
-        const webhookPath = `/bot${token}`;
-        const webhookUrl = `${PUBLIC_URL}${webhookPath}`;
-
-        app.post(webhookPath, (req, res) => {
-            bot.processUpdate(req.body);
-            res.sendStatus(200);
-        });
-
-        bot.setWebHook(webhookUrl).then(() => {
-            console.log(`Telegram Webhook activated: ${webhookUrl}`);
-        }).catch((err) => {
-            console.error('Webhook registration failed:', err.message);
-        });
-    } else {
-        // Use Polling mode when running locally
-        bot = new TelegramBot(token, { polling: true });
-        bot.on('polling_error', (error) => {
-            console.error('Telegram polling error:', error.code || error.message);
-        });
-        console.log('Telegram Bot operational in polling mode.');
-    }
-
-    // Direct /start command handler
-    bot.onText(/\/start/, (msg) => {
-        bot.sendGame(msg.chat.id, 'atomicblast').catch((err) => {
-            console.error('sendGame error:', err.message);
-            bot.sendMessage(msg.chat.id, `Welcome to Atomic Blast! Play here: ${PUBLIC_URL}`);
-        });
-    });
-
-    // Inline queries for sharing the game into chats
     bot.on('inline_query', (query) => {
         const results = [
             {
                 type: 'game',
-                id: query.id,
+                id: query.id, 
                 game_short_name: 'atomicblast'
             }
         ];
         bot.answerInlineQuery(query.id, results, { cache_time: 0 }).catch(console.error);
     });
 
-    // Launch button clicked from Telegram game card
     bot.on('callback_query', (query) => {
         if (query.game_short_name === 'atomicblast') {
             let roomId = "ROOM";
@@ -207,28 +171,24 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
             }
 
             const userName = encodeURIComponent(query.from.first_name || 'Player');
-            const userId = query.from.id;
-            const gameLink = `${PUBLIC_URL}/?room=${roomId}&name=${userName}&uid=${userId}`;
+            const userId = query.from.id; 
+            
+            const gameLink = `${GAME_URL}/?room=${roomId}&name=${userName}&uid=${userId}`;
 
             bot.answerCallbackQuery(query.id, { url: gameLink }).catch(console.error);
         }
     });
-
-    console.log("Telegram Bot logic initialized.");
+    
+    console.log("Telegram Bot logic initialized!");
 }
 
-// Keepalive self-ping for free-tier web services
-if (process.env.RENDER_EXTERNAL_URL || process.env.GAME_URL) {
-    setInterval(() => {
-        const pingTarget = `${PUBLIC_URL}/ping`;
-        const client = pingTarget.startsWith('https') ? https : http;
-        client.get(pingTarget, () => {}).on('error', (err) => {
-            console.error('Keepalive ping notice:', err.message);
-        });
-    }, 840000);
-}
+setInterval(() => {
+    https.get(GAME_URL + '/ping', (res) => {
+        if (res.statusCode === 200) {}
+    }).on('error', (err) => {});
+}, 840000); 
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server listening on port ${PORT}`);
+    console.log(`Server is running on port ${PORT}`);
 });
