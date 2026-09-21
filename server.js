@@ -4,7 +4,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
 const TelegramBot = require('node-telegram-bot-api');
-const https = require('https'); 
+const https = require('https');
 
 const app = express();
 app.use(cors());
@@ -21,7 +21,7 @@ app.get('/ping', (req, res) => {
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: { origin: "*", methods: ["GET", "POST"] },
-    cookie: false 
+    cookie: false
 });
 
 const rooms = {};
@@ -36,28 +36,27 @@ io.on('connection', (socket) => {
         const uid = data.uid;
 
         if (!rooms[roomId]) {
-            rooms[roomId] = { players: [], gameStarted: false }; 
+            rooms[roomId] = { players: [], gameStarted: false };
         }
 
         const room = rooms[roomId];
 
-        // 1. IS THIS PERSON RECONNECTING?
+        // 1. Check if this player is reconnecting
         const existingPlayerIndex = (uid !== undefined && uid !== null)
             ? room.players.findIndex(p => p.uid === uid)
             : -1;
-        
+
         if (existingPlayerIndex !== -1) {
-            // Restore previous seat
             const p = room.players[existingPlayerIndex];
-            p.id = socket.id; 
-            p.online = true;  
-            
+            p.id = socket.id;
+            p.online = true;
+
             socket.join(roomId);
             console.log(`${playerName} RECONNECTED to ${roomId}`);
-            
+
             socket.emit('assignPlayerId', existingPlayerIndex);
             io.to(roomId).emit('lobbyPlayersUpdate', room.players);
-            
+
             socket.to(roomId).emit('playerStatus', { name: playerName, status: 'online' });
 
             if (room.gameStarted) {
@@ -66,15 +65,15 @@ io.on('connection', (socket) => {
                     io.to(activePeer.id).emit('hostPleaseSendState', socket.id);
                 }
             }
-            return; 
+            return;
         }
 
-        // 2. BRAND NEW PLAYER LOGIC
+        // 2. Handle brand new player
         socket.join(roomId);
 
         if (room.gameStarted) {
-            socket.emit('roomFull'); 
-            return; 
+            socket.emit('roomFull');
+            return;
         }
 
         const myPlayerId = room.players.length;
@@ -122,20 +121,20 @@ io.on('connection', (socket) => {
         for (const roomId in rooms) {
             const room = rooms[roomId];
             const player = room.players.find(p => p.id === socket.id);
-            
+
             if (player) {
                 player.online = false;
                 console.log(`${player.name} disconnected from ${roomId}`);
-                
+
                 socket.to(roomId).emit('playerStatus', { name: player.name, status: 'offline' });
                 io.to(roomId).emit('lobbyPlayersUpdate', room.players);
-                
+
                 const anyoneOnline = room.players.some(p => p.online);
                 if (!anyoneOnline) {
                     console.log(`Room ${roomId} is entirely empty. Deleting.`);
                     delete rooms[roomId];
                 }
-                break; 
+                break;
             }
         }
     });
@@ -144,21 +143,30 @@ io.on('connection', (socket) => {
 // --- TELEGRAM BOT LOGIC ---
 const rawToken = process.env.TELEGRAM_BOT_TOKEN;
 const token = rawToken ? rawToken.trim() : undefined;
-const GAME_URL = 'https://atomic-blast.onrender.com'; 
+const GAME_URL = 'https://atomic-blast.onrender.com';
 
 if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
     const bot = new TelegramBot(token, { polling: true });
-    bot.deleteWebHook().catch(console.error);
+    bot.deleteWebHook().catch(() => {});
+
+    // Catch collision errors during container redeploys
+    bot.on('polling_error', (error) => {
+        if (error.code !== 'ETELEGRAM') {
+            console.error('Polling error:', error.message);
+        }
+    });
 
     bot.on('inline_query', (query) => {
         const results = [
             {
                 type: 'game',
-                id: query.id, 
+                id: query.id,
                 game_short_name: 'atomicblast'
             }
         ];
-        bot.answerInlineQuery(query.id, results, { cache_time: 0 }).catch(console.error);
+        bot.answerInlineQuery(query.id, results, { cache_time: 0 }).catch(() => {
+            console.log('Inline query expired before server woke up.');
+        });
     });
 
     bot.on('callback_query', (query) => {
@@ -171,22 +179,24 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
             }
 
             const userName = encodeURIComponent(query.from.first_name || 'Player');
-            const userId = query.from.id; 
-            
+            const userId = query.from.id;
+
             const gameLink = `${GAME_URL}/?room=${roomId}&name=${userName}&uid=${userId}`;
 
-            bot.answerCallbackQuery(query.id, { url: gameLink }).catch(console.error);
+            bot.answerCallbackQuery(query.id, { url: gameLink }).catch(() => {
+                console.log('Button click expired before backend finished waking up.');
+            });
         }
     });
-    
+
     console.log("Telegram Bot logic initialized!");
 }
 
 setInterval(() => {
     https.get(GAME_URL + '/ping', (res) => {
         if (res.statusCode === 200) {}
-    }).on('error', (err) => {});
-}, 840000); 
+    }).on('error', () => {});
+}, 840000);
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
