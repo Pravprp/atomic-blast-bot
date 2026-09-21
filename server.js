@@ -8,6 +8,7 @@ const https = require('https');
 
 const app = express();
 app.use(cors());
+app.use(express.json());
 
 app.use(express.static(__dirname));
 
@@ -27,10 +28,10 @@ const io = new Server(server, {
 
 const rooms = {};
 
-// Dynamic public URL resolution for Render deployment
-const PUBLIC_URL = process.env.RENDER_EXTERNAL_URL || process.env.GAME_URL || 'https://atomic-blast.onrender.com';
+// Clean external URL formatting
+const PUBLIC_URL = (process.env.RENDER_EXTERNAL_URL || process.env.GAME_URL || 'https://atomic-blast.onrender.com').replace(/\/$/, '');
 
-// --- MULTIPLAYER GAME LOGIC ---
+// --- MULTIPLAYER SOCKET LOGIC ---
 io.on('connection', (socket) => {
     console.log(`Connection opened: ${socket.id}`);
 
@@ -147,16 +148,43 @@ const rawToken = process.env.TELEGRAM_BOT_TOKEN;
 const token = rawToken ? rawToken.trim() : undefined;
 
 if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
-    const bot = new TelegramBot(token, { polling: true });
+    const isProduction = Boolean(process.env.RENDER_EXTERNAL_URL || process.env.GAME_URL);
+    let bot;
 
-    bot.on('polling_error', (error) => {
-        console.error('Telegram polling error:', error.code || error.message);
+    if (isProduction) {
+        // Use Webhook mode on Render to avoid 409 polling conflicts during deploys
+        bot = new TelegramBot(token);
+        const webhookPath = `/bot${token}`;
+        const webhookUrl = `${PUBLIC_URL}${webhookPath}`;
+
+        app.post(webhookPath, (req, res) => {
+            bot.processUpdate(req.body);
+            res.sendStatus(200);
+        });
+
+        bot.setWebHook(webhookUrl).then(() => {
+            console.log(`Telegram Webhook activated: ${webhookUrl}`);
+        }).catch((err) => {
+            console.error('Webhook registration failed:', err.message);
+        });
+    } else {
+        // Use Polling mode when running locally
+        bot = new TelegramBot(token, { polling: true });
+        bot.on('polling_error', (error) => {
+            console.error('Telegram polling error:', error.code || error.message);
+        });
+        console.log('Telegram Bot operational in polling mode.');
+    }
+
+    // Direct /start command handler
+    bot.onText(/\/start/, (msg) => {
+        bot.sendGame(msg.chat.id, 'atomicblast').catch((err) => {
+            console.error('sendGame error:', err.message);
+            bot.sendMessage(msg.chat.id, `Welcome to Atomic Blast! Play here: ${PUBLIC_URL}`);
+        });
     });
 
-    bot.deleteWebHook().catch((err) => {
-        console.warn('Webhook reset notice:', err.message);
-    });
-
+    // Inline queries for sharing the game into chats
     bot.on('inline_query', (query) => {
         const results = [
             {
@@ -168,6 +196,7 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
         bot.answerInlineQuery(query.id, results, { cache_time: 0 }).catch(console.error);
     });
 
+    // Launch button clicked from Telegram game card
     bot.on('callback_query', (query) => {
         if (query.game_short_name === 'atomicblast') {
             let roomId = "ROOM";
@@ -185,20 +214,18 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
         }
     });
 
-    console.log("Telegram Bot operational.");
+    console.log("Telegram Bot logic initialized.");
 }
 
-// Keepalive self-ping for free-tier hosting platforms
+// Keepalive self-ping for free-tier web services
 if (process.env.RENDER_EXTERNAL_URL || process.env.GAME_URL) {
     setInterval(() => {
-        const pingTarget = (process.env.RENDER_EXTERNAL_URL || process.env.GAME_URL) + '/ping';
+        const pingTarget = `${PUBLIC_URL}/ping`;
         const client = pingTarget.startsWith('https') ? https : http;
-        client.get(pingTarget, (res) => {
-            // Keepalive verified
-        }).on('error', (err) => {
+        client.get(pingTarget, () => {}).on('error', (err) => {
             console.error('Keepalive ping notice:', err.message);
         });
-    }, 840000); // Runs every 14 minutes
+    }, 840000);
 }
 
 const PORT = process.env.PORT || 3000;
