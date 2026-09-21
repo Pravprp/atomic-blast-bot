@@ -4,7 +4,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
 const TelegramBot = require('node-telegram-bot-api');
-const https = require('https');
+const https = require('https'); 
 
 const app = express();
 app.use(cors());
@@ -20,95 +20,73 @@ app.get('/ping', (req, res) => {
 
 const server = http.createServer(app);
 const io = new Server(server, {
-    cors: { origin: "*", methods: ["GET", "POST"] }
+    cors: { origin: "*", methods: ["GET", "POST"] },
+    cookie: false 
 });
 
-// rooms[roomId] = { players: [...], gameStarted: bool, settings: { numPlayers, rows, cols } }
 const rooms = {};
 
+// --- MULTIPLAYER GAME LOGIC ---
 io.on('connection', (socket) => {
-    console.log(`Connected: ${socket.id}`);
+    console.log(`Connection opened: ${socket.id}`);
 
     socket.on('joinRoom', (data) => {
         const roomId = data.roomId;
-        const playerName = data.playerName || 'Player';
-        const uid = data.uid;
+        const playerName = data.playerName || 'Guest';
+        const uid = data.uid; // NEW: The player's permanent ID!
 
         if (!rooms[roomId]) {
-            rooms[roomId] = {
-                players: [],
-                gameStarted: false,
-                settings: { numPlayers: 2, rows: 6, cols: 6 }
-            };
+            rooms[roomId] = { players: [], gameStarted: false }; 
         }
 
         const room = rooms[roomId];
-        socket.join(roomId);
 
-        // 1. RECONNECTING TO ACTIVE GAME
-        if (room.gameStarted) {
-            const existingIndex = room.players.findIndex(p => p.uid === uid);
-            if (existingIndex !== -1) {
-                const p = room.players[existingIndex];
-                p.id = socket.id;
-                p.online = true;
+        // 1. IS THIS PERSON RECONNECTING?
+        const existingPlayerIndex = room.players.findIndex(p => p.uid === uid);
+        
+        if (existingPlayerIndex !== -1) {
+            // Give them their seat back!
+            const p = room.players[existingPlayerIndex];
+            p.id = socket.id; // Update their connection ID
+            p.online = true;  // Mark them back online
+            
+            socket.join(roomId);
+            console.log(`${playerName} RECONNECTED to ${roomId}`);
+            
+            socket.emit('assignPlayerId', existingPlayerIndex);
+            io.to(roomId).emit('lobbyPlayersUpdate', room.players);
+            
+            // Tell everyone else they came back!
+            socket.to(roomId).emit('playerStatus', { name: playerName, status: 'online' });
 
-                socket.emit('assignPlayerId', existingIndex);
-                io.to(roomId).emit('lobbyPlayersUpdate', room.players);
-                socket.to(roomId).emit('playerStatus', { name: playerName, status: 'online' });
-
-                // Request active board from another online player
+            // If the game is actively running, ask someone else to send them the live board!
+            if (room.gameStarted) {
                 const activePeer = room.players.find(other => other.online && other.id !== socket.id);
                 if (activePeer) {
                     io.to(activePeer.id).emit('hostPleaseSendState', socket.id);
                 }
-                return;
-            } else {
-                socket.emit('roomFull');
-                return;
             }
+            return; 
         }
 
-        // 2. IN LOBBY (Clean up duplicate sessions for same UID)
-        const duplicateIndex = room.players.findIndex(p => p.uid === uid);
-        if (duplicateIndex !== -1) {
-            room.players[duplicateIndex].id = socket.id;
-            room.players[duplicateIndex].online = true;
-            room.players[duplicateIndex].name = playerName;
-        } else {
-            room.players.push({ id: socket.id, uid: uid, name: playerName, online: true });
+        // 2. BRAND NEW PLAYER LOGIC
+        socket.join(roomId);
+
+        if (room.gameStarted) {
+            socket.emit('roomFull'); 
+            return; 
         }
 
-        // Send settings to newcomer
-        socket.emit('lobbyUpdated', room.settings);
+        const myPlayerId = room.players.length;
+        // Save their permanent UID and set online status to true
+        room.players.push({ id: socket.id, uid: uid, name: playerName, online: true });
 
-        // Re-assign IDs for all players in lobby to ensure room.players[0] is Host
-        room.players.forEach((p, idx) => {
-            io.to(p.id).emit('assignPlayerId', idx);
-        });
-
+        socket.emit('assignPlayerId', myPlayerId);
         io.to(roomId).emit('lobbyPlayersUpdate', room.players);
     });
 
-    socket.on('lobbyUpdate', (data) => {
-        if (rooms[data.roomId]) {
-            rooms[data.roomId].settings = {
-                numPlayers: data.numPlayers,
-                rows: data.rows,
-                cols: data.cols
-            };
-            socket.to(data.roomId).emit('lobbyUpdated', data);
-        }
-    });
-
-    socket.on('hostStartedGame', (data) => {
-        if (rooms[data.roomId]) {
-            rooms[data.roomId].gameStarted = true;
-            socket.to(data.roomId).emit('gameStartedByHost', data);
-        }
-    });
-
     socket.on('requestGameState', (roomId) => {
+        // Ask ANY online player to share the board state with the spectator
         if (rooms[roomId]) {
             const activePeer = rooms[roomId].players.find(p => p.online && p.id !== socket.id);
             if (activePeer) {
@@ -121,64 +99,48 @@ io.on('connection', (socket) => {
         io.to(data.spectatorId).emit('spectatorCatchUp', data.state);
     });
 
-    socket.on('returnToLobby', (roomId) => {
-        const room = rooms[roomId];
-        if (room) {
-            room.gameStarted = false;
-            // Clean up players who dropped out during the game
-            room.players = room.players.filter(p => p.online);
-
-            // Re-assign hosts
-            room.players.forEach((p, idx) => {
-                io.to(p.id).emit('assignPlayerId', idx);
-            });
-
-            io.to(roomId).emit('returnedToLobby');
-            io.to(roomId).emit('lobbyPlayersUpdate', room.players);
-        }
+    socket.on('hostStartedGame', (data) => {
+        if (rooms[data.roomId]) rooms[data.roomId].gameStarted = true;
+        socket.to(data.roomId).emit('gameStartedByHost', data);
     });
 
-    socket.on('makeMove', (data) => {
-        socket.to(data.roomId).emit('receiveMove', data);
+    socket.on('returnToLobby', (roomId) => {
+        if (rooms[roomId]) rooms[roomId].gameStarted = false;
+    });
+
+    socket.on('lobbyUpdate', (data) => {
+        socket.to(data.roomId).emit('lobbyUpdated', data);
     });
 
     socket.on('timeoutSkip', (data) => {
         socket.to(data.roomId).emit('receiveTimeoutSkip');
     });
 
+    socket.on('makeMove', (data) => {
+        socket.to(data.roomId).emit('receiveMove', data);
+    });
+
     socket.on('disconnect', () => {
         for (const roomId in rooms) {
             const room = rooms[roomId];
-            const playerIndex = room.players.findIndex(p => p.id === socket.id);
-
-            if (playerIndex !== -1) {
-                const player = room.players[playerIndex];
-
-                if (!room.gameStarted) {
-                    // In lobby: remove them completely so host privileges pass to next in line
-                    room.players.splice(playerIndex, 1);
-
-                    if (room.players.length === 0) {
-                        delete rooms[roomId];
-                    } else {
-                        // Promote new host and reassign indices
-                        room.players.forEach((p, idx) => {
-                            io.to(p.id).emit('assignPlayerId', idx);
-                        });
-                        io.to(roomId).emit('lobbyPlayersUpdate', room.players);
-                    }
-                } else {
-                    // In active game: mark offline so reconnect is possible
-                    player.online = false;
-                    socket.to(roomId).emit('playerStatus', { name: player.name, status: 'offline' });
-                    io.to(roomId).emit('lobbyPlayersUpdate', room.players);
-
-                    const anyoneOnline = room.players.some(p => p.online);
-                    if (!anyoneOnline) {
-                        delete rooms[roomId];
-                    }
+            const player = room.players.find(p => p.id === socket.id);
+            
+            if (player) {
+                // DON'T DELETE THEM! Just mark them as offline so they can return.
+                player.online = false;
+                console.log(`${player.name} disconnected from ${roomId}`);
+                
+                // Broadcast to the room that they left
+                socket.to(roomId).emit('playerStatus', { name: player.name, status: 'offline' });
+                io.to(roomId).emit('lobbyPlayersUpdate', room.players);
+                
+                // If NO ONE is online anymore, clean up the RAM
+                const anyoneOnline = room.players.some(p => p.online);
+                if (!anyoneOnline) {
+                    console.log(`Room ${roomId} is entirely empty. Deleting.`);
+                    delete rooms[roomId];
                 }
-                break;
+                break; 
             }
         }
     });
@@ -187,51 +149,50 @@ io.on('connection', (socket) => {
 // --- TELEGRAM BOT LOGIC ---
 const rawToken = process.env.TELEGRAM_BOT_TOKEN;
 const token = rawToken ? rawToken.trim() : undefined;
-// Use Render's system URL or custom environment variable
-const GAME_URL = process.env.RENDER_EXTERNAL_URL || process.env.GAME_URL || 'https://atomic-blast.onrender.com';
+const GAME_URL = 'https://atomic-blast.onrender.com'; 
 
 if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
     const bot = new TelegramBot(token, { polling: true });
+    bot.deleteWebHook().catch(console.error);
 
     bot.on('inline_query', (query) => {
-        bot.answerInlineQuery(query.id, [
+        const results = [
             {
                 type: 'game',
-                id: query.id,
+                id: query.id, 
                 game_short_name: 'atomicblast'
             }
-        ], { cache_time: 0 }).catch(console.error);
+        ];
+        bot.answerInlineQuery(query.id, results, { cache_time: 0 }).catch(console.error);
     });
 
     bot.on('callback_query', (query) => {
         if (query.game_short_name === 'atomicblast') {
             let roomId = "ROOM";
-
-            // CRITICAL FIX: Share the same room across group chats and message clicks
             if (query.inline_message_id) {
                 roomId = query.inline_message_id.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10).toUpperCase();
-            } else if (query.message) {
-                // If clicked from a chat message, bind to chat ID + message ID
-                roomId = `C${Math.abs(query.message.chat.id)}M${query.message.message_id}`.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10).toUpperCase();
             } else {
-                roomId = "GLOBAL";
+                roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
             }
 
+            // NEW: We now grab their UNIQUE TELEGRAM ID so they can reconnect safely!
             const userName = encodeURIComponent(query.from.first_name || 'Player');
-            const userId = query.from.id;
+            const userId = query.from.id; 
+            
             const gameLink = `${GAME_URL}/?room=${roomId}&name=${userName}&uid=${userId}`;
 
             bot.answerCallbackQuery(query.id, { url: gameLink }).catch(console.error);
         }
     });
-
+    
     console.log("Telegram Bot logic initialized!");
 }
 
-// Keep-alive ping
 setInterval(() => {
-    https.get(GAME_URL + '/ping', (res) => {}).on('error', () => {});
-}, 600000); // every 10 minutes
+    https.get(GAME_URL + '/ping', (res) => {
+        if (res.statusCode === 200) {}
+    }).on('error', (err) => {});
+}, 840000); 
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
