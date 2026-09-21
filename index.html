@@ -242,6 +242,7 @@
         let PLAYER_NAME = urlParams.get('name') || "Player"; 
         let UID = urlParams.get('uid');
 
+        // Provide persistent fallback ID for non-Telegram browser testing
         if (!UID) {
             UID = 'guest_' + Math.random().toString(36).substring(2, 9);
         }
@@ -997,7 +998,6 @@
                 currentPlayerIndex = (currentPlayerIndex + 1) % numPlayers;
                 loopCount++;
             } while (!players[currentPlayerIndex].alive && loopCount < numPlayers + 1);
-
         }
 
         function declareWinner(playerId) {
