@@ -181,7 +181,7 @@
                 <div style="background: rgba(0,0,0,0.4); border-radius: 0.5rem; padding: 0.75rem; margin-bottom: 0.75rem; text-align: left; max-height: 120px; overflow-y: auto;">
                     <p style="color: #9ca3af; font-size: 0.75rem; font-weight: bold; margin-top: 0; margin-bottom: 0.5rem; text-transform: uppercase;">Players in Lobby</p>
                     <ul id="playerNamesList" style="list-style: none; padding: 0; margin: 0; font-size: 0.875rem;">
-                        <li style="color: #9ca3af;">Waiting for server response...</li>
+                        <li style="color: #9ca3af;">Connecting to match lobby...</li>
                     </ul>
                 </div>
 
@@ -250,21 +250,22 @@
         const CELL_PADDING = 2;
         const ANIMATION_SPEED = 0.15; 
 
-        // Automatically determine server host URL
+        // Target your exact Render deployment domain
         const SERVER_URL = (window.location.protocol.startsWith('http') && window.location.hostname !== 'localhost' && !window.location.hostname.includes('127.0.0.1'))
             ? window.location.origin
-            : 'https://atomic-blast.onrender.com';
+            : 'https://atomic-blast-bot.onrender.com';
 
         const socket = io(SERVER_URL, {
             transports: ['websocket', 'polling'],
-            reconnectionAttempts: 10,
-            timeout: 20000
+            reconnectionAttempts: 15,
+            timeout: 25000
         });
         
         const urlParams = new URLSearchParams(window.location.search);
         let ROOM_ID = urlParams.get('room');
         let PLAYER_NAME = urlParams.get('name') || "Player"; 
 
+        // Unique identifier per browser tab to avoid multi-tab ID collision
         let UID = urlParams.get('uid');
         if (!UID) {
             try {
@@ -288,17 +289,15 @@
         let lobbyPlayers = []; 
 
         socket.on('connect', () => {
-            console.log("Connected to server successfully with ID:", socket.id);
             const statusText = document.getElementById('connectionStatus');
             if (statusText) {
-                statusText.innerText = "🟢 Connected! Joining room...";
+                statusText.innerText = "🟢 Connected! Entering room...";
                 statusText.style.color = "#4ade80";
             }
             socket.emit('joinRoom', { roomId: ROOM_ID, playerName: PLAYER_NAME, uid: UID });
         });
 
         socket.on('connect_error', (error) => {
-            console.warn("Connection error to server:", error.message);
             const statusText = document.getElementById('connectionStatus');
             const startBtn = document.getElementById('startBtn');
             if (statusText) {
@@ -552,7 +551,8 @@
         const eliminationText = document.getElementById('eliminationText');
 
         function copyInviteLink() {
-            const inviteUrl = `${window.location.origin}${window.location.pathname}?room=${ROOM_ID}`;
+            const baseUrl = window.location.protocol.startsWith('http') ? window.location.origin : 'https://atomic-blast-bot.onrender.com';
+            const inviteUrl = `${baseUrl}/?room=${ROOM_ID}`;
             if (navigator.clipboard) {
                 navigator.clipboard.writeText(inviteUrl).then(() => {
                     const btn = document.getElementById('copyInviteBtn');
