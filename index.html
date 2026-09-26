@@ -171,7 +171,7 @@
                 <div style="background: rgba(0,0,0,0.4); border-radius: 0.5rem; padding: 0.75rem; margin-bottom: 1.5rem; text-align: left; max-height: 120px; overflow-y: auto;">
                     <p style="color: #9ca3af; font-size: 0.75rem; font-weight: bold; margin-top: 0; margin-bottom: 0.5rem; text-transform: uppercase;">Players in Lobby</p>
                     <ul id="playerNamesList" style="list-style: none; padding: 0; margin: 0; font-size: 0.875rem;">
-                        </ul>
+                    </ul>
                 </div>
 
                 <div style="margin-bottom: 1.5rem;">
@@ -241,6 +241,20 @@
         let ROOM_ID = urlParams.get('room');
         let PLAYER_NAME = urlParams.get('name') || "Player"; 
 
+        // Generate or retrieve unique persistent ID
+        let UID = urlParams.get('uid');
+        if (!UID) {
+            try {
+                UID = localStorage.getItem('atomic_blast_uid');
+                if (!UID) {
+                    UID = 'user_' + Math.random().toString(36).substring(2, 10);
+                    localStorage.setItem('atomic_blast_uid', UID);
+                }
+            } catch (e) {
+                UID = 'user_' + Math.random().toString(36).substring(2, 10);
+            }
+        }
+
         if (!ROOM_ID) {
             ROOM_ID = Math.random().toString(36).substring(2, 8).toUpperCase();
             try { window.history.replaceState({}, '', `?room=${ROOM_ID}`); } catch (error) {}
@@ -249,7 +263,7 @@
         let myPlayerId = null; 
 
         socket.on('connect', () => {
-            socket.emit('joinRoom', { roomId: ROOM_ID, playerName: PLAYER_NAME });
+            socket.emit('joinRoom', { roomId: ROOM_ID, playerName: PLAYER_NAME, uid: UID });
         });
 
         socket.on('assignPlayerId', (id) => {
@@ -285,19 +299,20 @@
             processMove(data.r, data.c);
         });
 
+        socket.on('returnToLobby', () => {
+            resetGameMenu(true);
+        });
+
         let connectedPlayersCount = 1; 
         let lobbyPlayers = []; 
         
-        // THE MASTER UI CONTROLLER
-        // This function dynamically changes what EVERYONE sees in the lobby instantly!
         function updateLobbyUI() {
-            if (myPlayerId === 'spectator') return; // Spectators have their own screen
+            if (myPlayerId === 'spectator') return;
 
             const statusText = document.getElementById('connectionStatus');
             const startBtn = document.getElementById('startBtn');
 
             if (myPlayerId === 0) {
-                // --- HOST LOGIC ---
                 statusText.innerText = `🟢 Connected: ${connectedPlayersCount}`;
                 statusText.style.color = '#4ade80';
 
@@ -312,19 +327,16 @@
                     startBtn.style.opacity = '1';
                 }
             } else {
-                // --- GUEST LOGIC (Dynamic VIP Queue) ---
                 if (myPlayerId >= numPlayers) {
-                    // I am outside the allowed player count (e.g., I am player #3, but host selected 2)
                     statusText.innerText = `🔴 Room is Full (Max ${numPlayers})`;
-                    statusText.style.color = '#ef4444'; // Red
+                    statusText.style.color = '#ef4444';
                     
                     startBtn.innerText = "ROOM FULL";
                     startBtn.disabled = true;
                     startBtn.style.opacity = '0.5';
                 } else {
-                    // I am inside the allowed player count!
                     statusText.innerText = `🟢 Connected: ${connectedPlayersCount}`;
-                    statusText.style.color = '#4ade80'; // Green
+                    statusText.style.color = '#4ade80';
                     
                     startBtn.innerText = "WAITING FOR HOST...";
                     startBtn.disabled = true;
@@ -335,9 +347,8 @@
 
         socket.on('lobbyPlayersUpdate', (playersArray) => {
             lobbyPlayers = playersArray;
-            connectedPlayersCount = playersArray.length;
+            connectedPlayersCount = playersArray.filter(p => p.online !== false).length;
             
-            // Keep myPlayerId perfectly synced even if someone above me leaves the line
             const myIndex = playersArray.findIndex(p => p.id === socket.id);
             if (myIndex !== -1 && myPlayerId !== 'spectator') {
                 myPlayerId = myIndex;
@@ -349,21 +360,21 @@
                 playersArray.forEach((p, index) => {
                     const li = document.createElement('li');
                     li.style.marginBottom = '0.4rem';
+                    const isOnline = p.online !== false;
+                    const dot = isOnline ? '🟢' : '⚪ (away)';
                     
                     if (index === 0) {
-                        li.innerHTML = `⭐ <strong style="color:#facc15">${p.name}</strong> joined (Host)`;
+                        li.innerHTML = `${dot} ⭐ <strong style="color:#facc15">${p.name}</strong> joined (Host)`;
                     } else {
-                        li.innerHTML = `🎮 <strong style="color:#60a5fa">${p.name}</strong> joined`;
+                        li.innerHTML = `${dot} 🎮 <strong style="color:#60a5fa">${p.name}</strong> joined`;
                     }
                     listEl.appendChild(li);
                 });
             }
 
-            // Immediately recalculate everyone's UI
             updateLobbyUI();
         }); 
 
-        // This triggers if someone joins AFTER the host clicked Play
         socket.on('roomFull', () => {
             const statusText = document.getElementById('connectionStatus');
             if (statusText) {
@@ -455,7 +466,6 @@
                 if (nextRows === 6) btns[2].classList.add('active');
                 if (nextRows === 8) btns[3].classList.add('active');
                 
-                // Immediately recalculate if I am now kicked out or allowed in!
                 updateLobbyUI();
             }
         });
@@ -509,15 +519,13 @@
             ctx = canvas.getContext('2d');
 
             if (screen.orientation && screen.orientation.lock) {
-                screen.orientation.lock('portrait').catch(err => {
-                    console.log("Orientation lock not supported:", err);
-                });
+                screen.orientation.lock('portrait').catch(() => {});
             }
 
             document.getElementById('pInc').onclick = () => updatePlayerCount(1);
             document.getElementById('pDec').onclick = () => updatePlayerCount(-1);
             document.getElementById('startBtn').onclick = startGame;
-            undoBtn.onclick = undoMove;
+            undoBtn.onclick = () => undoMove(false);
 
             thickGridBtn.onclick = () => {
                 isThickGrid = !isThickGrid;
@@ -530,7 +538,7 @@
                 }
             };
 
-            winnerOverlay.onclick = resetGameMenu;
+            winnerOverlay.onclick = () => resetGameMenu(false);
 
             window.addEventListener('resize', handleResize);
             canvas.addEventListener('mousedown', handleInput);
@@ -567,8 +575,6 @@
             numPlayers = Math.max(2, Math.min(8, numPlayers + delta));
             playerCountDisplay.innerText = numPlayers;
             broadcastLobbyUpdate(); 
-            
-            // Instantly update the Host's button when changing the target number
             updateLobbyUI();
         }
 
@@ -595,7 +601,6 @@
 
             const gridW = cols * cellSize;
             const gridH = rows * cellSize;
-            ctx.translate((width - gridW) / 2, (height - gridH) / 2);
 
             canvas.offsetX = (width - gridW) / 2;
             canvas.offsetY = (height - gridH) / 2;
@@ -622,8 +627,6 @@
             rows = nextRows;
             cols = nextCols;
             
-            // THE QUEUE CONVERTER
-            // If the game started, but my queue number is too high, I instantly become a spectator!
             if (myPlayerId >= numPlayers) {
                 myPlayerId = 'spectator';
                 menuOverlay.classList.add('hidden');
@@ -684,15 +687,16 @@
             startTimer(); 
         }
 
-        function resetGameMenu() {
+        function resetGameMenu(isFromRemote) {
             gameActive = false;
+            clearInterval(turnTimer);
             winnerOverlay.classList.add('hidden');
             menuOverlay.classList.remove('hidden');
             gameControls.classList.add('hidden');
             undoBtn.disabled = true;
             eliminationPopup.classList.add('hidden');
 
-            if (myPlayerId === 0) {
+            if (myPlayerId === 0 && !isFromRemote && socket) {
                 socket.emit('returnToLobby', ROOM_ID);
             }
         }
@@ -792,7 +796,6 @@
                     
                     if (currentSeconds === backupTriggerTime) {
                         clearInterval(turnTimer);
-                        console.log(`Active player completely disconnected! Player ${myPlayerId} is forcing the skip.`);
                         if (socket) {
                             socket.emit('timeoutSkip', { roomId: ROOM_ID });
                             processTimeout();
@@ -818,7 +821,6 @@
             if (!gameActive || isAnimating) return;
             
             if (currentPlayerIndex !== myPlayerId) {
-                console.log("Not your turn!");
                 return; 
             }
 
@@ -854,7 +856,6 @@
             clearInterval(turnTimer); 
             
             const cell = grid[r][c];
-            
             players[currentPlayerIndex].timeLimit = 15; 
             
             saveState(); 
@@ -1007,7 +1008,6 @@
                 currentPlayerIndex = (currentPlayerIndex + 1) % numPlayers;
                 loopCount++;
             } while (!players[currentPlayerIndex].alive && loopCount < numPlayers + 1);
-
         }
 
         function declareWinner(playerId) {
@@ -1032,10 +1032,14 @@
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.restore();
 
+            ctx.save();
+            ctx.translate(canvas.offsetX, canvas.offsetY);
+
             if (!gameActive && projectiles.length === 0) {
                 if (grid.length > 0) {
                     drawGrid();
                 }
+                ctx.restore();
                 requestAnimationFrame(gameLoop);
                 return;
             }
@@ -1044,6 +1048,7 @@
             drawGrid();
             updateAndDrawProjectiles();
 
+            ctx.restore();
             requestAnimationFrame(gameLoop);
         }
 
@@ -1117,7 +1122,6 @@
             }
 
             const color = players[cell.owner].color;
-
             ctx.fillStyle = color;
 
             if (cell.owner === currentPlayerIndex) {
