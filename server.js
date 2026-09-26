@@ -7,13 +7,14 @@ const TelegramBot = require('node-telegram-bot-api');
 
 const app = express();
 
-// FIXED: Locked down CORS policy to prevent unauthorized domain hijacking
 app.use(cors({
     origin: ["https://atomic-blast-bot.onrender.com", "http://localhost:3000"],
     methods: ["GET", "POST"]
 }));
 
+app.use(express.json());
 app.use(express.static(__dirname));
+
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
@@ -43,7 +44,6 @@ io.on('connection', (socket) => {
         const uid = data.uid || null;
 
         if (!rooms[roomId]) {
-            // FIXED: Server now initializes and tracks the game state
             rooms[roomId] = { players: [], gameStarted: false, gameState: null };
         }
 
@@ -64,7 +64,6 @@ io.on('connection', (socket) => {
             socket.to(roomId).emit('playerStatus', { name: playerName, status: 'online' });
 
             if (room.gameStarted && room.gameState) {
-                // FIXED: Server sends state directly, bypassing malicious host manipulation
                 socket.emit('spectatorCatchUp', room.gameState);
             }
             return;
@@ -85,7 +84,6 @@ io.on('connection', (socket) => {
     });
 
     socket.on('requestGameState', (roomId) => {
-        // FIXED: Server answers spectator directly from memory
         if (rooms[roomId] && rooms[roomId].gameState) {
             socket.emit('spectatorCatchUp', rooms[roomId].gameState);
         }
@@ -94,7 +92,6 @@ io.on('connection', (socket) => {
     socket.on('hostStartedGame', (data) => {
         if (rooms[data.roomId]) {
             rooms[data.roomId].gameStarted = true;
-            // Initialize basic state structure
             rooms[data.roomId].gameState = {
                 rows: data.rows,
                 cols: data.cols,
@@ -105,7 +102,6 @@ io.on('connection', (socket) => {
         socket.to(data.roomId).emit('gameStartedByHost', data);
     });
 
-    // FIXED: Continuous state syncing from the host to keep server updated
     socket.on('syncGameState', (data) => {
         if (rooms[data.roomId]) {
             rooms[data.roomId].gameState = data.state;
@@ -159,28 +155,26 @@ io.on('connection', (socket) => {
     });
 });
 
-// --- TELEGRAM BOT LOGIC ---
+// --- TELEGRAM BOT LOGIC (WEBHOOK IMPLEMENTATION) ---
 const rawToken = process.env.TELEGRAM_BOT_TOKEN;
 const token = rawToken ? rawToken.trim() : undefined;
 const GAME_URL = process.env.RENDER_EXTERNAL_URL || 'https://atomic-blast-bot.onrender.com';
 
 if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
-    const bot = new TelegramBot(token, { polling: true });
+    // Initialized without polling to avoid conflicts during deployment
+    const bot = new TelegramBot(token);
 
-    // FIXED: Added polling retry logic for network blips
-    bot.on('polling_error', (error) => {
-        const errorDetail = (error.response && error.response.body && error.response.body.description) 
-            ? error.response.body.description 
-            : error.message;
-        console.error('Telegram polling error:', errorDetail);
-        
-        bot.stopPolling().then(() => {
-            console.log("Retrying Telegram polling in 5 seconds...");
-            setTimeout(() => bot.startPolling(), 5000);
-        });
+    // Set up webhook route
+    const webhookPath = `/bot${token}`;
+    bot.setWebHook(`${GAME_URL}${webhookPath}`)
+        .then(() => console.log(`Telegram Webhook set to: ${GAME_URL}${webhookPath}`))
+        .catch((err) => console.error('Failed to set Webhook:', err.message));
+
+    // Handle updates directly through Express
+    app.post(webhookPath, (req, res) => {
+        bot.processUpdate(req.body);
+        res.sendStatus(200);
     });
-
-    bot.deleteWebHook().catch(() => {});
 
     bot.on('inline_query', (query) => {
         const results = [{ type: 'game', id: query.id, game_short_name: 'atomicblast' }];
@@ -204,12 +198,18 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
         }
     });
 
-    console.log("Telegram Bot logic initialized!");
+    console.log("Telegram Bot logic initialized via Webhook!");
 }
-
-// FIXED: Removed the internal self-pinging setInterval that caused crashes on Render.
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
+});
+
+// Graceful shutdown handling for Render
+process.on('SIGTERM', () => {
+    console.log('SIGTERM received. Shutting down gracefully...');
+    server.close(() => {
+        process.exit(0);
+    });
 });
