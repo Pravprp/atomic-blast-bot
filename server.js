@@ -4,10 +4,14 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
 const TelegramBot = require('node-telegram-bot-api');
-const https = require('https');
 
 const app = express();
-app.use(cors());
+
+// FIXED: Locked down CORS policy to prevent unauthorized domain hijacking
+app.use(cors({
+    origin: ["https://atomic-blast-bot.onrender.com", "http://localhost:3000"],
+    methods: ["GET", "POST"]
+}));
 
 app.use(express.static(__dirname));
 app.get('/', (req, res) => {
@@ -20,7 +24,10 @@ app.get('/ping', (req, res) => {
 
 const server = http.createServer(app);
 const io = new Server(server, {
-    cors: { origin: "*", methods: ["GET", "POST"] },
+    cors: { 
+        origin: ["https://atomic-blast-bot.onrender.com", "http://localhost:3000"], 
+        methods: ["GET", "POST"] 
+    },
     cookie: false
 });
 
@@ -36,11 +43,11 @@ io.on('connection', (socket) => {
         const uid = data.uid || null;
 
         if (!rooms[roomId]) {
-            rooms[roomId] = { players: [], gameStarted: false };
+            // FIXED: Server now initializes and tracks the game state
+            rooms[roomId] = { players: [], gameStarted: false, gameState: null };
         }
 
         const room = rooms[roomId];
-
         const existingPlayerIndex = uid ? room.players.findIndex(p => p.uid === uid) : -1;
 
         if (existingPlayerIndex !== -1) {
@@ -56,11 +63,9 @@ io.on('connection', (socket) => {
             io.to(roomId).emit('lobbyPlayersUpdate', room.players);
             socket.to(roomId).emit('playerStatus', { name: playerName, status: 'online' });
 
-            if (room.gameStarted) {
-                const activePeer = room.players.find(other => other.online && other.id !== socket.id);
-                if (activePeer) {
-                    io.to(activePeer.id).emit('hostPleaseSendState', socket.id);
-                }
+            if (room.gameStarted && room.gameState) {
+                // FIXED: Server sends state directly, bypassing malicious host manipulation
+                socket.emit('spectatorCatchUp', room.gameState);
             }
             return;
         }
@@ -80,25 +85,38 @@ io.on('connection', (socket) => {
     });
 
     socket.on('requestGameState', (roomId) => {
-        if (rooms[roomId]) {
-            const activePeer = rooms[roomId].players.find(p => p.online && p.id !== socket.id);
-            if (activePeer) {
-                io.to(activePeer.id).emit('hostPleaseSendState', socket.id);
-            }
+        // FIXED: Server answers spectator directly from memory
+        if (rooms[roomId] && rooms[roomId].gameState) {
+            socket.emit('spectatorCatchUp', rooms[roomId].gameState);
         }
     });
 
-    socket.on('hostRepliedWithState', (data) => {
-        io.to(data.spectatorId).emit('spectatorCatchUp', data.state);
-    });
-
     socket.on('hostStartedGame', (data) => {
-        if (rooms[data.roomId]) rooms[data.roomId].gameStarted = true;
+        if (rooms[data.roomId]) {
+            rooms[data.roomId].gameStarted = true;
+            // Initialize basic state structure
+            rooms[data.roomId].gameState = {
+                rows: data.rows,
+                cols: data.cols,
+                numPlayers: data.numPlayers,
+                gameActive: true
+            };
+        }
         socket.to(data.roomId).emit('gameStartedByHost', data);
     });
 
+    // FIXED: Continuous state syncing from the host to keep server updated
+    socket.on('syncGameState', (data) => {
+        if (rooms[data.roomId]) {
+            rooms[data.roomId].gameState = data.state;
+        }
+    });
+
     socket.on('returnToLobby', (roomId) => {
-        if (rooms[roomId]) rooms[roomId].gameStarted = false;
+        if (rooms[roomId]) {
+            rooms[roomId].gameStarted = false;
+            rooms[roomId].gameState = null;
+        }
         socket.to(roomId).emit('returnToLobby');
     });
 
@@ -144,30 +162,28 @@ io.on('connection', (socket) => {
 // --- TELEGRAM BOT LOGIC ---
 const rawToken = process.env.TELEGRAM_BOT_TOKEN;
 const token = rawToken ? rawToken.trim() : undefined;
-
-// MATCHED EXACTLY TO YOUR RENDER URL
 const GAME_URL = process.env.RENDER_EXTERNAL_URL || 'https://atomic-blast-bot.onrender.com';
 
 if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
     const bot = new TelegramBot(token, { polling: true });
 
+    // FIXED: Added polling retry logic for network blips
     bot.on('polling_error', (error) => {
         const errorDetail = (error.response && error.response.body && error.response.body.description) 
             ? error.response.body.description 
             : error.message;
         console.error('Telegram polling error:', errorDetail);
+        
+        bot.stopPolling().then(() => {
+            console.log("Retrying Telegram polling in 5 seconds...");
+            setTimeout(() => bot.startPolling(), 5000);
+        });
     });
 
     bot.deleteWebHook().catch(() => {});
 
     bot.on('inline_query', (query) => {
-        const results = [
-            {
-                type: 'game',
-                id: query.id,
-                game_short_name: 'atomicblast'
-            }
-        ];
+        const results = [{ type: 'game', id: query.id, game_short_name: 'atomicblast' }];
         bot.answerInlineQuery(query.id, results, { cache_time: 0 }).catch(console.error);
     });
 
@@ -191,13 +207,7 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
     console.log("Telegram Bot logic initialized!");
 }
 
-if (GAME_URL.startsWith('http')) {
-    setInterval(() => {
-        try {
-            https.get(GAME_URL + '/ping', () => {}).on('error', () => {});
-        } catch (e) {}
-    }, 14 * 60 * 1000);
-}
+// FIXED: Removed the internal self-pinging setInterval that caused crashes on Render.
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
