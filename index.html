@@ -235,6 +235,13 @@
     
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
+        // FIXED: XSS Sanitization function
+        function sanitize(str) {
+            const temp = document.createElement('div');
+            temp.textContent = str;
+            return temp.innerHTML;
+        }
+
         const COLORS = [
             { name: 'RED', main: '#E6194B', glow: 'rgba(230, 25, 75, 0.8)' },
             { name: 'GREEN', main: '#3CB44B', glow: 'rgba(60, 180, 75, 0.8)' },
@@ -250,7 +257,6 @@
         const CELL_PADDING = 2;
         const ANIMATION_SPEED = 0.15; 
 
-        // Target your exact Render deployment domain
         const SERVER_URL = (window.location.protocol.startsWith('http') && window.location.hostname !== 'localhost' && !window.location.hostname.includes('127.0.0.1'))
             ? window.location.origin
             : 'https://atomic-blast-bot.onrender.com';
@@ -265,14 +271,14 @@
         let ROOM_ID = urlParams.get('room');
         let PLAYER_NAME = urlParams.get('name') || "Player"; 
 
-        // Unique identifier per browser tab to avoid multi-tab ID collision
+        // FIXED: Using localStorage so UID is not lost if tab is closed on mobile
         let UID = urlParams.get('uid');
         if (!UID) {
             try {
-                UID = sessionStorage.getItem('atomic_blast_uid');
+                UID = localStorage.getItem('atomic_blast_uid');
                 if (!UID) {
                     UID = 'user_' + Math.random().toString(36).substring(2, 10);
-                    sessionStorage.setItem('atomic_blast_uid', UID);
+                    localStorage.setItem('atomic_blast_uid', UID);
                 }
             } catch (e) {
                 UID = 'user_' + Math.random().toString(36).substring(2, 10);
@@ -404,7 +410,9 @@
                     const isOnline = p.online !== false;
                     const dot = isOnline ? '🟢' : '⚪ (away)';
                     const defaultName = index === 0 ? "Player 1" : `Player ${index + 1}`;
-                    const displayName = p.name || defaultName;
+                    
+                    // FIXED: Applied XSS sanitization
+                    const displayName = sanitize(p.name || defaultName);
                     
                     if (index === 0) {
                         li.innerHTML = `${dot} ⭐ <strong style="color:#facc15">${displayName}</strong> (Host)`;
@@ -439,23 +447,7 @@
             };
         }); 
 
-        socket.on('hostPleaseSendState', (spectatorSocketId) => {
-            if (myPlayerId === 0) { 
-                const currentState = {
-                    rows: rows,
-                    cols: cols,
-                    numPlayers: numPlayers,
-                    grid: grid,
-                    players: players, 
-                    currentPlayerIndex: currentPlayerIndex,
-                    gameActive: gameActive,
-                    currentSeconds: currentSeconds,
-                    moveHistory: moveHistory 
-                };
-                socket.emit('hostRepliedWithState', { spectatorId: spectatorSocketId, state: currentState });
-            }
-        });
-
+        // FIXED: Spectator catch-up logic now driven entirely by server payload
         socket.on('spectatorCatchUp', (state) => {
             if (state.gameActive) {
                 rows = state.rows;
@@ -466,7 +458,7 @@
                 currentPlayerIndex = state.currentPlayerIndex;
                 gameActive = state.gameActive;
                 currentSeconds = state.currentSeconds;
-                moveHistory = state.moveHistory;
+                moveHistory = state.moveHistory || [];
 
                 handleResize(); 
                 menuOverlay.classList.add('hidden'); 
@@ -704,7 +696,7 @@
                 let pName = lobbyPlayers[i] && lobbyPlayers[i].name ? lobbyPlayers[i].name : `Player ${i+1}`;
                 players.push({
                     id: i,
-                    name: pName, 
+                    name: sanitize(pName), 
                     color: COLORS[i].main,
                     glow: COLORS[i].glow,
                     alive: true,
@@ -742,6 +734,28 @@
             isShowingElimination = false;
             updateUndoUI();
             startTimer(); 
+            
+            if (myPlayerId === 0) syncGameStateWithServer();
+        }
+
+        // FIXED: Synchronization logic to push exact authoritative state back to server memory
+        function syncGameStateWithServer() {
+            if (myPlayerId === 0 && socket && gameActive) {
+                socket.emit('syncGameState', {
+                    roomId: ROOM_ID,
+                    state: {
+                        rows: rows,
+                        cols: cols,
+                        numPlayers: numPlayers,
+                        grid: grid,
+                        players: players,
+                        currentPlayerIndex: currentPlayerIndex,
+                        gameActive: gameActive,
+                        currentSeconds: currentSeconds,
+                        moveHistory: moveHistory 
+                    }
+                });
+            }
         }
 
         function resetGameMenu(isFromRemote) {
@@ -795,6 +809,8 @@
             if (isFromServer === false && socket) {
                 socket.emit('requestUndo', { roomId: ROOM_ID });
             }
+            
+            syncGameStateWithServer();
         }
 
         function updateUndoUI() {
@@ -869,6 +885,7 @@
 
             nextTurn();
             startTimer();
+            syncGameStateWithServer();
         }
 
         function handleInput(e) {
@@ -935,6 +952,7 @@
                     projectiles = []; 
                     const winnerId = activeOwners.values().next().value;
                     declareWinner(winnerId);
+                    syncGameStateWithServer();
                     return; 
                 }
             }
@@ -972,6 +990,7 @@
                     nextTurn();
                     startTimer(); 
                 }
+                syncGameStateWithServer();
             }
         }
 
