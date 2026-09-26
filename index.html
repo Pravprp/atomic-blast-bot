@@ -83,7 +83,8 @@
             color: white; font-weight: bold; font-size: 1.25rem; display: flex;
             align-items: center; justify-content: center; transition: background-color 0.2s;
         }
-        .circle-btn:hover { background-color: #4b5563; }
+        .circle-btn:hover:not(:disabled) { background-color: #4b5563; }
+        .circle-btn:disabled { opacity: 0.4; cursor: not-allowed; }
         #playerCountDisplay { font-family: monospace; font-size: 1.875rem; width: 3rem; color: #60a5fa; }
 
         .grid-grid {
@@ -96,14 +97,23 @@
         .grid-btn.active {
             background: #3b82f6; color: white; border-color: #3b82f6; font-weight: bold;
         }
+        .grid-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
         #startBtn {
             padding: 1rem; background: linear-gradient(to right, #2563eb, #9333ea);
             border-radius: 0.75rem; font-size: 1.125rem; font-weight: bold; color: white;
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); transition: transform 0.1s; margin-top: 10px;
         }
-        #startBtn:hover { transform: scale(1.02); }
-        #startBtn:active { transform: scale(0.95); }
+        #startBtn:hover:not(:disabled) { transform: scale(1.02); }
+        #startBtn:active:not(:disabled) { transform: scale(0.95); }
+        #startBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .invite-btn {
+            background: rgba(255, 255, 255, 0.1); border: 1px dashed rgba(255, 255, 255, 0.3);
+            color: #93c5fd; padding: 0.5rem; border-radius: 0.5rem; font-size: 0.8rem;
+            width: 100%; margin-bottom: 1rem; transition: all 0.2s;
+        }
+        .invite-btn:hover { background: rgba(255, 255, 255, 0.18); }
 
         .label-text {
             display: block; color: #9ca3af; font-size: 0.75rem; font-weight: 700;
@@ -164,15 +174,20 @@
                 <h2 class="text-3xl font-bold mb-6 text-white"
                     style="letter-spacing: 0.05em; font-size: 1.875rem; margin-bottom: 1.5rem;">NEW GAME</h2>
 
-                <p id="connectionStatus" style="color: #4ade80; font-weight: bold; margin-bottom: 0.5rem;">
-                     🟢 Connected: 1
+                <p id="connectionStatus" style="color: #facc15; font-weight: bold; margin-bottom: 0.5rem;">
+                     🟡 Connecting to server...
                 </p>
 
-                <div style="background: rgba(0,0,0,0.4); border-radius: 0.5rem; padding: 0.75rem; margin-bottom: 1.5rem; text-align: left; max-height: 120px; overflow-y: auto;">
+                <div style="background: rgba(0,0,0,0.4); border-radius: 0.5rem; padding: 0.75rem; margin-bottom: 0.75rem; text-align: left; max-height: 120px; overflow-y: auto;">
                     <p style="color: #9ca3af; font-size: 0.75rem; font-weight: bold; margin-top: 0; margin-bottom: 0.5rem; text-transform: uppercase;">Players in Lobby</p>
                     <ul id="playerNamesList" style="list-style: none; padding: 0; margin: 0; font-size: 0.875rem;">
+                        <li style="color: #9ca3af;">Waiting for server response...</li>
                     </ul>
                 </div>
+
+                <button id="copyInviteBtn" class="invite-btn" onclick="copyInviteLink()">
+                    📋 Copy Invite Link
+                </button>
 
                 <div style="margin-bottom: 1.5rem;">
                     <label class="label-text">Number of Players</label>
@@ -193,8 +208,8 @@
                     </div>
                 </div>
 
-                <button id="startBtn" class="w-full">
-                    PLAY
+                <button id="startBtn" class="w-full" disabled>
+                    CONNECTING...
                 </button>
             </div>
         </div>
@@ -235,20 +250,28 @@
         const CELL_PADDING = 2;
         const ANIMATION_SPEED = 0.15; 
 
-        const socket = io();
+        // Automatically determine server host URL
+        const SERVER_URL = (window.location.protocol.startsWith('http') && window.location.hostname !== 'localhost' && !window.location.hostname.includes('127.0.0.1'))
+            ? window.location.origin
+            : 'https://atomic-blast.onrender.com';
+
+        const socket = io(SERVER_URL, {
+            transports: ['websocket', 'polling'],
+            reconnectionAttempts: 10,
+            timeout: 20000
+        });
         
         const urlParams = new URLSearchParams(window.location.search);
         let ROOM_ID = urlParams.get('room');
         let PLAYER_NAME = urlParams.get('name') || "Player"; 
 
-        // Generate or retrieve unique persistent ID
         let UID = urlParams.get('uid');
         if (!UID) {
             try {
-                UID = localStorage.getItem('atomic_blast_uid');
+                UID = sessionStorage.getItem('atomic_blast_uid');
                 if (!UID) {
                     UID = 'user_' + Math.random().toString(36).substring(2, 10);
-                    localStorage.setItem('atomic_blast_uid', UID);
+                    sessionStorage.setItem('atomic_blast_uid', UID);
                 }
             } catch (e) {
                 UID = 'user_' + Math.random().toString(36).substring(2, 10);
@@ -261,29 +284,58 @@
         }
 
         let myPlayerId = null; 
+        let connectedPlayersCount = 0; 
+        let lobbyPlayers = []; 
 
         socket.on('connect', () => {
+            console.log("Connected to server successfully with ID:", socket.id);
+            const statusText = document.getElementById('connectionStatus');
+            if (statusText) {
+                statusText.innerText = "🟢 Connected! Joining room...";
+                statusText.style.color = "#4ade80";
+            }
             socket.emit('joinRoom', { roomId: ROOM_ID, playerName: PLAYER_NAME, uid: UID });
+        });
+
+        socket.on('connect_error', (error) => {
+            console.warn("Connection error to server:", error.message);
+            const statusText = document.getElementById('connectionStatus');
+            const startBtn = document.getElementById('startBtn');
+            if (statusText) {
+                statusText.innerText = "🟡 Waking up server... (takes ~60s)";
+                statusText.style.color = "#facc15";
+            }
+            if (startBtn) {
+                startBtn.innerText = "SERVER STARTING...";
+                startBtn.disabled = true;
+            }
+        });
+
+        socket.on('disconnect', () => {
+            const statusText = document.getElementById('connectionStatus');
+            if (statusText) {
+                statusText.innerText = "🔴 Disconnected. Reconnecting...";
+                statusText.style.color = "#ef4444";
+            }
         });
 
         socket.on('assignPlayerId', (id) => {
             myPlayerId = id;
-            
-            if (myPlayerId !== 0) {
-                document.getElementById('pDec').disabled = true;
-                document.getElementById('pInc').disabled = true;
-                document.getElementById('pDec').style.opacity = '0.5';
-                document.getElementById('pInc').style.opacity = '0.5';
-                document.getElementById('pDec').style.cursor = 'not-allowed';
-                document.getElementById('pInc').style.cursor = 'not-allowed';
+            const pDec = document.getElementById('pDec');
+            const pInc = document.getElementById('pInc');
+            const gridBtns = document.querySelectorAll('.grid-btn');
 
-                const gridBtns = document.querySelectorAll('.grid-btn');
-                gridBtns.forEach(btn => {
-                    btn.disabled = true;
-                    btn.style.opacity = '0.5';
-                    btn.style.cursor = 'not-allowed';
-                });
+            if (myPlayerId !== 0) {
+                if (pDec) pDec.disabled = true;
+                if (pInc) pInc.disabled = true;
+                gridBtns.forEach(btn => btn.disabled = true);
+            } else {
+                if (pDec) pDec.disabled = false;
+                if (pInc) pInc.disabled = false;
+                gridBtns.forEach(btn => btn.disabled = false);
             }
+
+            updateLobbyUI();
         });
 
         socket.on('gameStartedByHost', (data) => {
@@ -303,44 +355,34 @@
             resetGameMenu(true);
         });
 
-        let connectedPlayersCount = 1; 
-        let lobbyPlayers = []; 
-        
         function updateLobbyUI() {
             if (myPlayerId === 'spectator') return;
 
             const statusText = document.getElementById('connectionStatus');
             const startBtn = document.getElementById('startBtn');
+            if (!statusText || !startBtn) return;
+
+            statusText.innerText = `🟢 Connected: ${connectedPlayersCount}`;
+            statusText.style.color = '#4ade80';
 
             if (myPlayerId === 0) {
-                statusText.innerText = `🟢 Connected: ${connectedPlayersCount}`;
-                statusText.style.color = '#4ade80';
-
                 if (connectedPlayersCount < numPlayers) {
                     const missing = numPlayers - connectedPlayersCount;
                     startBtn.innerText = `WAITING FOR ${missing} MORE...`;
                     startBtn.disabled = true;
-                    startBtn.style.opacity = '0.5';
                 } else {
                     startBtn.innerText = "PLAY";
                     startBtn.disabled = false;
-                    startBtn.style.opacity = '1';
                 }
             } else {
                 if (myPlayerId >= numPlayers) {
                     statusText.innerText = `🔴 Room is Full (Max ${numPlayers})`;
                     statusText.style.color = '#ef4444';
-                    
                     startBtn.innerText = "ROOM FULL";
                     startBtn.disabled = true;
-                    startBtn.style.opacity = '0.5';
                 } else {
-                    statusText.innerText = `🟢 Connected: ${connectedPlayersCount}`;
-                    statusText.style.color = '#4ade80';
-                    
-                    startBtn.innerText = "WAITING FOR HOST...";
+                    startBtn.innerText = "WAITING FOR HOST TO START...";
                     startBtn.disabled = true;
-                    startBtn.style.opacity = '0.5';
                 }
             }
         }
@@ -362,11 +404,13 @@
                     li.style.marginBottom = '0.4rem';
                     const isOnline = p.online !== false;
                     const dot = isOnline ? '🟢' : '⚪ (away)';
+                    const defaultName = index === 0 ? "Player 1" : `Player ${index + 1}`;
+                    const displayName = p.name || defaultName;
                     
                     if (index === 0) {
-                        li.innerHTML = `${dot} ⭐ <strong style="color:#facc15">${p.name}</strong> joined (Host)`;
+                        li.innerHTML = `${dot} ⭐ <strong style="color:#facc15">${displayName}</strong> (Host)`;
                     } else {
-                        li.innerHTML = `${dot} 🎮 <strong style="color:#60a5fa">${p.name}</strong> joined`;
+                        li.innerHTML = `${dot} 🎮 <strong style="color:#60a5fa">${displayName}</strong>`;
                     }
                     listEl.appendChild(li);
                 });
@@ -383,20 +427,13 @@
             }
 
             myPlayerId = 'spectator'; 
-
             document.getElementById('pDec').disabled = true;
             document.getElementById('pInc').disabled = true;
-            document.querySelectorAll('.grid-btn').forEach(btn => {
-                btn.disabled = true;
-                btn.style.opacity = '0.5';
-                btn.style.cursor = 'not-allowed';
-            });
+            document.querySelectorAll('.grid-btn').forEach(btn => btn.disabled = true);
             
             const startBtn = document.getElementById('startBtn');
             startBtn.innerText = "SPECTATE MATCH";
             startBtn.disabled = false; 
-            startBtn.style.opacity = '1';
-            
             startBtn.onclick = () => {
                 startBtn.innerText = "LOADING BOARD...";
                 socket.emit('requestGameState', ROOM_ID);
@@ -514,7 +551,20 @@
         const eliminationPopup = document.getElementById('eliminationPopup');
         const eliminationText = document.getElementById('eliminationText');
 
-        window.onload = () => {
+        function copyInviteLink() {
+            const inviteUrl = `${window.location.origin}${window.location.pathname}?room=${ROOM_ID}`;
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(inviteUrl).then(() => {
+                    const btn = document.getElementById('copyInviteBtn');
+                    btn.innerText = '✅ Link Copied!';
+                    setTimeout(() => { btn.innerText = '📋 Copy Invite Link'; }, 2000);
+                });
+            } else {
+                prompt("Copy this room invite link:", inviteUrl);
+            }
+        }
+
+        function initGame() {
             canvas = document.getElementById('gameCanvas');
             ctx = canvas.getContext('2d');
 
@@ -546,7 +596,13 @@
 
             handleResize();
             gameLoop();
-        };
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initGame);
+        } else {
+            initGame();
+        }
 
         function broadcastLobbyUpdate() {
             if (myPlayerId === 0 && socket) {
@@ -564,7 +620,7 @@
             nextCols = c;
             updateGridButtons(btn);
             broadcastLobbyUpdate();
-        }
+        };
 
         function updateGridButtons(activeBtn) {
             document.querySelectorAll('.grid-btn').forEach(b => b.classList.remove('active'));
@@ -580,6 +636,8 @@
 
         function handleResize() {
             const container = document.getElementById('game-container');
+            if (!container || !canvas) return;
+
             width = container.clientWidth;
             height = container.clientHeight;
 
@@ -643,8 +701,7 @@
 
             players = [];
             for (let i = 0; i < numPlayers; i++) {
-                let pName = lobbyPlayers[i] ? lobbyPlayers[i].name : `Player ${i+1}`;
-                
+                let pName = lobbyPlayers[i] && lobbyPlayers[i].name ? lobbyPlayers[i].name : `Player ${i+1}`;
                 players.push({
                     id: i,
                     name: pName, 
@@ -726,7 +783,6 @@
             if (isAnimating || moveHistory.length === 0 || !gameActive) return;
 
             const previousState = moveHistory.pop();
-
             grid = previousState.grid;
             players = previousState.players;
             currentPlayerIndex = previousState.currentPlayerIndex;
@@ -761,7 +817,6 @@
                 indicator.style.color = (p.id === 2 || p.id === 5) ? 'black' : 'white'; 
                 
                 const displaySeconds = Math.max(0, currentSeconds);
-
                 if (currentPlayerIndex === myPlayerId) {
                     indicator.innerText = `YOUR TURN (${displaySeconds}s)`;
                 } else {
@@ -793,7 +848,6 @@
                 } 
                 else if (currentSeconds < 0) {
                     const backupTriggerTime = -3 - myPlayerId; 
-                    
                     if (currentSeconds === backupTriggerTime) {
                         clearInterval(turnTimer);
                         if (socket) {
@@ -845,7 +899,6 @@
 
         function attemptMove(r, c) {
             const cell = grid[r][c];
-
             if (cell.owner === null || cell.owner === currentPlayerIndex) {
                 socket.emit('makeMove', { roomId: ROOM_ID, r: r, c: c });
                 processMove(r, c);
@@ -854,7 +907,6 @@
 
         function processMove(r, c) {
             clearInterval(turnTimer); 
-            
             const cell = grid[r][c];
             players[currentPlayerIndex].timeLimit = 15; 
             
