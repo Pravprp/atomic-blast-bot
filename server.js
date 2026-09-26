@@ -41,12 +41,12 @@ io.on('connection', (socket) => {
 
         const room = rooms[roomId];
 
-        // 1. IS THIS PERSON RECONNECTING? (Only if uid is valid)
         const existingPlayerIndex = uid ? room.players.findIndex(p => p.uid === uid) : -1;
 
         if (existingPlayerIndex !== -1) {
             const p = room.players[existingPlayerIndex];
             p.id = socket.id;
+            p.name = playerName;
             p.online = true;
 
             socket.join(roomId);
@@ -65,7 +65,6 @@ io.on('connection', (socket) => {
             return;
         }
 
-        // 2. BRAND NEW PLAYER LOGIC
         socket.join(roomId);
 
         if (room.gameStarted) {
@@ -145,16 +144,21 @@ io.on('connection', (socket) => {
 // --- TELEGRAM BOT LOGIC ---
 const rawToken = process.env.TELEGRAM_BOT_TOKEN;
 const token = rawToken ? rawToken.trim() : undefined;
-const GAME_URL = process.env.RENDER_EXTERNAL_URL || 'https://atomic-blast.onrender.com';
+
+// MATCHED EXACTLY TO YOUR RENDER URL
+const GAME_URL = process.env.RENDER_EXTERNAL_URL || 'https://atomic-blast-bot.onrender.com';
 
 if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
     const bot = new TelegramBot(token, { polling: true });
 
     bot.on('polling_error', (error) => {
-        console.error('Telegram polling error:', error.code || error.message);
+        const errorDetail = (error.response && error.response.body && error.response.body.description) 
+            ? error.response.body.description 
+            : error.message;
+        console.error('Telegram polling error:', errorDetail);
     });
 
-    bot.deleteWebHook().catch(console.error);
+    bot.deleteWebHook().catch(() => {});
 
     bot.on('inline_query', (query) => {
         const results = [
@@ -187,11 +191,10 @@ if (token && token !== 'YOUR_BOT_TOKEN_HERE') {
     console.log("Telegram Bot logic initialized!");
 }
 
-// Keep Render alive during active hours
 if (GAME_URL.startsWith('http')) {
     setInterval(() => {
         try {
-            https.get(GAME_URL + '/ping', (res) => {}).on('error', () => {});
+            https.get(GAME_URL + '/ping', () => {}).on('error', () => {});
         } catch (e) {}
     }, 14 * 60 * 1000);
 }
